@@ -5,22 +5,22 @@
 #include "m68k.h"
 #include "z80.h"
 #include "vdp.h"
-#include "SN76489.h"
+//#include "SN76489.h"
 
 //KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS | INIT_GDB);
-KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS | INIT_OCRAM);
+KOS_INIT_FLAGS(INIT_IRQ | INIT_MALLOCSTATS | INIT_OCRAM);
 
 
 //char *romname = "/cd/sonic_1.bin";
 //char *romname = "/cd/pstar_2.bin";
-char *romname = "/cd/contra.bin";
+char *romname = "/cd/sonic2";
 
 char *scrcapname = "/pc/home/jkf/src/dc/gen-emu/screen.ppm";
 
 uint8_t debug = 0;
 uint8_t quit = 0;
 uint8_t dump = 0;
-uint8_t pause = 0;
+//uint8_t pause = 0;
 
 uint32_t rom_load(char *name);
 void rom_free(void);
@@ -28,7 +28,7 @@ void run_one_field(void);
 void gen_init(void);
 void gen_reset(void);
 
-extern SN76489 PSG; 
+//extern SN76489 PSG; 
 extern struct vdp_s vdp;
 
 
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 
 	do {
 		run_one_field();
-
+#if 0
 paused:
 		ch = kbd_get_key();
 		switch(ch) {
@@ -66,7 +66,12 @@ paused:
 		}
 		if (pause)
 			goto paused;
-	} while (!quit);
+#endif
+	} while (1); //!quit);
+
+while(1) {
+	printf("it died\n");
+}
 
 	rom_free();
 
@@ -82,8 +87,8 @@ void run_one_field(void)
 		vdp_interrupt(line);
 
 		m68k_execute(488);
-		if (z80_enabled())
-			z80_execute(228);
+//		if (z80_enabled())
+	//		z80_execute(228);
 
 		if (line < 224) {
 			/* render scanline to vram*/
@@ -92,7 +97,7 @@ void run_one_field(void)
 	}
 
 	/* Render debug cram display. */
-#if 0
+#if 1
 	vdp_render_cram();
 #endif
 
@@ -100,10 +105,10 @@ void run_one_field(void)
 	do_frame();
 
 	/* Send sound to ASIC, call once per frame */
-	Sync76489(&PSG,SN76489_FLUSH);
+	//Sync76489(&PSG,SN76489_FLUSH);
 
 	/* input processing */
 	cnt++;
-	if ((cnt % 60) == 0)
-		printf(".");
+//	if ((cnt % 60) == 0)
+//		printf("%d\n",cnt);
 }

@@ -9,27 +9,32 @@
 #include "cart.h"
 
 extern uint16_t *m68k_ram16;
+#define PVR 1
 
 struct vdp_s vdp;
+
+#if PVR
 pvr_poly_hdr_t disp_hdr[2];
 pvr_ptr_t disp_txr[2];
 pvr_ptr_t display_txr;
 pvr_poly_hdr_t cram_hdr;
 pvr_ptr_t cram_txr;
+#endif
 uint8_t display_ptr;
 
 uint8_t nt_cells[4] = { 32, 64, 0, 128 };
 uint8_t mode_cells[4] = { 32, 40, 0, 40 };
 
 
-static uint16_t *ocr_vram = (uint16_t *)0x7c002000;
+static uint16_t *ocr_vram/*[320]; */ = (uint16_t *)0x7c002000;
 
 
 void vdp_init(void)
 {
+#if PVR
 	pvr_poly_cxt_t cxt;
 	int filters;
-
+//debug = 0;
 #if 0
 	filters = vid_check_cable() ? PVR_FILTER_NONE : PVR_FILTER_BILINEAR;
 #else
@@ -39,6 +44,7 @@ void vdp_init(void)
 	/* Allocate and build display texture data */
 	disp_txr[0] = pvr_mem_malloc(512 * 256 * 2);
 	disp_txr[1] = pvr_mem_malloc(512 * 256 * 2);
+
 	pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY,
 		PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED,
 		512, 256, disp_txr[0], filters);
@@ -53,10 +59,12 @@ void vdp_init(void)
 
 	/* Allocate and build cram texture data */
 	cram_txr = pvr_mem_malloc(8 * 8 * 2);
+
 	pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY,
 		PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED,
 		8, 8, cram_txr, PVR_FILTER_NONE);
 	pvr_poly_compile(&cram_hdr, &cxt);
+#endif
 }
 
 uint16_t vdp_control_read(void)
@@ -68,8 +76,8 @@ uint16_t vdp_control_read(void)
 
 	ret |= (vdp.status & 0x00ff);
 
-	if (debug)
-		printf("VDP C -> %04x\n", ret);
+	//if (debug)
+		//printf("VDP C -> %04x\n", ret);
 
 	return ret;
 }
@@ -77,8 +85,8 @@ uint16_t vdp_control_read(void)
 /* val is little endian */
 void vdp_control_write(uint16_t val)
 {
-	if (debug)
-		printf("VDP C <- %04x\n", val);
+//	if (debug)
+	//	printf("VDP C <- %04x\n", val);
 
 	if((val & 0xc000) == 0x8000) {
 		if(!vdp.write_pending) {
@@ -135,8 +143,8 @@ void vdp_control_write(uint16_t val)
 						src_mem = (uint16_t *)(cart.rom + (vdp.regs[23] << 17));
 						src_mask = 0xffff;
 					} else {
-						printf("DMA from an unknown block... 0x%02x\n", (vdp.regs[23] << 1));
-						arch_abort();
+						while(1) {printf("DMA from an unknown block... 0x%02x\n", (vdp.regs[23] << 1));}
+						//arch_abort();
 					}
 
 					/* 68k -> vdp */
@@ -215,8 +223,8 @@ uint16_t vdp_data_read(void)
 		break;
 	}
 
-	if (debug)
-		printf("VDP D -> %04x\n", ret);
+	//if (debug)
+		//printf("VDP D -> %04x\n", ret);
 
 	vdp.addr += 2;
 
@@ -227,8 +235,8 @@ void vdp_data_write(uint16_t val)
 {
 	vdp.write_pending = 0;
 
-	if (debug)
-		printf("VDP D <- %04x\n", val);
+//	if (debug)
+	//	printf("VDP D <- %04x\n", val);
 
 	switch(vdp.code) {
 	case 0x01:
@@ -272,7 +280,7 @@ void vdp_data_write(uint16_t val)
 					vdp.addr += vdp.regs[15];
 				} while(--len);
 			} else {
-				printf("VDP DMA Error, code %02x, r23 %02x\n", vdp.code, vdp.regs[23]);
+				//printf("VDP DMA Error, code %02x, r23 %02x\n", vdp.code, vdp.regs[23]);
 			}
 		}
 	}
@@ -341,8 +349,8 @@ void vdp_render_cram(void)
 void vdp_render_plane(int line, int plane, int priority)
 {
 	int row, pixrow, i, j;
-	sint16_t hscroll = 0;
-	sint8_t  col_off, pix_off, pix_tmp;
+	int16_t hscroll = 0;
+	int8_t  col_off, pix_off, pix_tmp;
 	uint16_t *p;
 
 	p = plane ? vdp.bgb : vdp.bga;
@@ -379,7 +387,7 @@ void vdp_render_plane(int line, int plane, int priority)
 
 		if ((name_ent >> 15) == priority) {
 			uint32_t data;
-			sint32_t pal, pixel;
+			int32_t pal, pixel;
 
 			pal = (name_ent >> 9) & 0x30;
 
@@ -439,8 +447,8 @@ void vdp_render_sprites(int line, int priority)
     uint32_t ppl=0;
     uint32_t dis_ppl=256;
     uint32_t sol=0;  
-    sint32_t sx, sy;
-    sint32_t list_ordered[80];
+    int32_t sx, sy;
+    int32_t list_ordered[80];
     uint64_t spr_ent;
 
     for(j=0;j<80;++j)
@@ -592,4 +600,7 @@ void vdp_render_scanline(int line)
 	}
 
 	sq_cpy((((uint16_t *)display_txr) + (line * 512)), ocr_vram, (vdp.dis_cells * 8 * 2));
+/*for(int x=0;x<(vdp.sc_width * 8);x++) {
+	vram_s[line * 640 + x] = ocr_vram[x];
+}*/
 }

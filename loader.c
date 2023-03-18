@@ -6,8 +6,9 @@
 #include "gen-emu.h"
 #include "cart.h"
 
+#include "sonic2.h"
 
-#include "md5.h"
+//#include "md5.h"
 
 
 /* Super Street Fighter 2 Game IDs. */
@@ -23,21 +24,28 @@ uint32_t rom_load(char *name)
 	uint32_t fd, len, i;
 	uint8_t *rom = NULL;
 	uint8 md5sum[16];
-	MD5_CTX ctx;
+//	MD5_CTX ctx;
 
 	printf("Loading rom %s ... ", name);
-
+memset((void*)&cart, 0, sizeof(cart_t));
+#if 0
 	fd = fs_open(name, O_RDONLY);
 	if (fd == 0) {
 		printf("rom_load(): fs_open() failed.\n");
 		goto error;
 	}
-
+#endif
 	/* Get file length. */
-	len = fs_seek(fd, 0, SEEK_END);
-	fs_seek(fd, 0, SEEK_SET);
-
-	if (strstr(name, ".bin") != NULL) {
+//	len = fs_seek(fd, 0, SEEK_END);
+//	fs_seek(fd, 0, SEEK_SET);
+len = 1048576;
+rom = sonic2_rom;
+//		rom = malloc(1 * 1024 * 1024);
+//for(int i=0;i<len;i++) {
+//	rom[i] = sonic2_rom[i];
+//}
+#if 0
+	if (strstr(name, "sonic2") != NULL) {
 		/* Allocate ROM memory. */
 //		rom = malloc(len);
 		rom = malloc(5 * 1024 * 1024);
@@ -47,7 +55,10 @@ uint32_t rom_load(char *name)
 		}
 
 		fs_read(fd, rom, len);
-	} else
+	}
+#endif
+#if 0
+	else
 	if (strstr(name, ".smd") != NULL) {
 		uint8_t buf[512];
 
@@ -65,8 +76,8 @@ uint32_t rom_load(char *name)
 			blocks = len / 16384;
 
 			/* Allocate ROM memory. */
-//			rom = malloc(len);
-			rom = malloc(5 * 1024 * 1024);
+			rom = malloc(len);
+//			rom = malloc(5 * 1024 * 1024);
 			if (rom == NULL) {
 				printf("rom_load(): malloc() failed.\n");
 				goto error;
@@ -101,15 +112,15 @@ uint32_t rom_load(char *name)
 		printf("ROM is not a recognized format.\n");
 		goto error;
 	}
-
 	fs_close(fd);
+#endif
 
 	printf("Done.\n");
 
 	/* Add ROM to cart. */
 	cart.rom = rom;
 	cart.rom_len = len;
-
+#if 0
 	/* Check if this cart has save ram. */
 	if (rom[0x1b0] == 'R' && rom[0x1b1] == 'A') {
 		uint32_t sr_start, sr_end, sr_len;
@@ -159,7 +170,8 @@ uint32_t rom_load(char *name)
 	} else {
 		cart.banked = 0;
 	}
-
+#endif	
+#if 0
 	/* Calculate MD5 checksum of ROM. */
 	MD5Init(&ctx);
 	MD5Update(&ctx, rom, len);
@@ -170,16 +182,19 @@ uint32_t rom_load(char *name)
 	for(i = 0; i < 16; i++)
 		printf("%02x", md5sum[i]);
 	printf("\n");
-
+#endif
 
 	printf("Cart details...\n");
-	printf("ROM Length: 0x%x (%d) bytes\n", cart.rom_len, cart.rom_len);
+//	while(1){
+		printf("ROM Length: 0x%x (%d) bytes\n", cart.rom_len, cart.rom_len);
+	//}
+#if 0	
 	if (cart.sram_len)
 		printf("RAM Length: 0x%x (%d) bytes%s\n", cart.sram_len, cart.sram_len,
 			   (cart.sram_banked ? ", banked" : ""));
 	if (cart.banked)
 		printf("Detected banked cartridge. Enabling banking.\n");
-
+#endif
 	return 1;
 
 error:

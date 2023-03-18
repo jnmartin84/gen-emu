@@ -15,6 +15,8 @@ extern uint8_t display_ptr;
 
 void do_frame()
 {
+//	if(1)
+//return;
 	pvr_vertex_t vert;
 	int x, y, w, h;
 
@@ -25,9 +27,12 @@ void do_frame()
 	display_txr = disp_txr[display_ptr];
 	display_ptr = (display_ptr ? 0 : 1);
 
-	pvr_wait_ready();
-	pvr_scene_begin();
-	pvr_list_begin(PVR_LIST_OP_POLY);
+//	pvr_wait_ready();
+	//while(1) {printf("wait ready worked\n");}
+	pvr_scene_begin(); 
+if(	pvr_list_begin(PVR_LIST_OP_POLY))  {
+	while(1) { printf("pvr_list_begin failed\n"); }
+}
 
 	/* Main display */
 #if 0
@@ -61,7 +66,7 @@ void do_frame()
 	vert.v = 0.0f;
 	pvr_prim(&vert, sizeof(vert));
 
-#if 0
+#if 1
 	/* CRAM display */
 	x = 550; y = 25;
 	w = 64; h = 64;
@@ -90,6 +95,10 @@ void do_frame()
 	pvr_prim(&vert, sizeof(vert));
 #endif
 
-	pvr_list_finish();
-	pvr_scene_finish();
+if(pvr_list_finish()) {
+	while(1) { printf("pvr_list_finish failed\n"); }
+}
+	if(pvr_scene_finish()) {
+	while(1) { printf("pvr_scene_finish failed\n"); }
+}
 }

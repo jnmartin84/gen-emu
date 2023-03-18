@@ -6,7 +6,7 @@
 #include "z80.h"
 #include "vdp.h"
 #include "input.h"
-#include "SN76489.h"
+//#include "SN76489.h"
 
 
 pvr_init_params_t pvr_params = {
@@ -20,17 +20,19 @@ pvr_init_params_t pvr_params = {
 void gen_init(void)
 {
 	pvr_init(&pvr_params);
+	pvr_mem_reset();
 	vid_border_color(0, 0, 255);
 	pvr_set_bg_color(0, 0, 1.0f);
 
 	vdp_init();
 	ctlr_init();
+//printf("bwah\n");
 }
 
 void gen_reset(void)
 {
 	m68k_pulse_reset();
-	z80_init();
+//	z80_init();
 
 //	Reset76489(&PSG, 0);
 //	Sync76489(&PSG, SN76489_SYNC);

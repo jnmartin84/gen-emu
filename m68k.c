@@ -24,6 +24,7 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 	addr &= 0xffffff;
 
 	if (addr < 0x400000) {
+#if 0
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -37,8 +38,11 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 				}
 			}
 		} else {
+#endif
 			ret = cart.rom[addr];
+#if 0
 		}
+#endif
 	} else 
 	if (addr >= 0xe00000) {
 		ret = m68k_ram[addr & 0xffff];
@@ -167,12 +171,13 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 		ret = z80_running;
 		break;
 	default:
-		printf("Unhandled memory read from %06x\n", addr);
+		while(1) {printf("Unhandled 8-bit memory read from %06x\n", addr);
+		}
 		quit = 1;
 	}
 
-	if (debug)
-		printf("M68K  %06x -> %02x\n", addr, ret);
+//	if (debug)
+	//	printf("M68K  %06x -> %02x\n", addr, ret);
 
 	return(ret);
 }
@@ -183,6 +188,7 @@ uint32_t m68k_read_memory_16(uint32_t addr)
 	addr &= 0xffffff;
 
 	if (addr < 0x400000) {
+#if 0
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -196,8 +202,11 @@ uint32_t m68k_read_memory_16(uint32_t addr)
 				}
 			}
 		} else {
+#endif
 			ret = ((uint16_t *)cart.rom)[addr >> 1];
+#if 0
 		}
+#endif
 		SWAPBYTES16(ret);
 	} else
 	if (addr >= 0xe00000) {
@@ -306,12 +315,13 @@ uint32_t m68k_read_memory_16(uint32_t addr)
 		ret = z80_running << 8;
 		break;
 	default:
-		printf("Unhandled memory read from %06x\n", addr);
+		while(1) {		printf("Unhandled 16-bit memory read from %06x\n", addr);
+}
 		quit = 1;
 	}
 
-	if (debug)
-		printf("M68K  %06x -> %04x\n", addr, ret);
+//	if (debug)
+	//	printf("M68K  %06x -> %04x\n", addr, ret);
 
 	return(ret);
 }
@@ -331,8 +341,8 @@ void m68k_write_memory_8(uint32_t addr, uint32_t val)
 	addr &= 0xffffff;
 	val &= 0xff;
 
-	if (debug)
-		printf("M68K  %06x <- %02x\n", addr, val);
+//	if (debug)
+	//	printf("M68K  %06x <- %02x\n", addr, val);
 
 	if (addr < 0x400000) {
 		if ((cart.sram_len > 0) &&
@@ -436,7 +446,7 @@ void m68k_write_memory_8(uint32_t addr, uint32_t val)
 			cart.banks[(addr & 0xe) >> 1] = (uint32_t)(cart.rom + (val << 19));
 		break;
 	default:
-		printf("Unhandled memory write to %06x, value %02x\n", addr, val);
+		while(1) {printf("Unhandled 8-bit memory write to %06x, value %02x\n", addr, val);}
 		quit = 1;
 	}
 }
@@ -446,8 +456,8 @@ void m68k_write_memory_16(uint32_t addr, uint32_t val)
 	addr &= 0xffffff;
 	val &= 0xffff;
 
-	if (debug)
-		printf("M68K  %06x <- %04x\n", addr, val);
+//	if (debug)
+	//	printf("M68K  %06x <- %04x\n", addr, val);
 
 	if (addr < 0x400000) {
 		if ((cart.sram_len > 0) &&
@@ -520,7 +530,7 @@ void m68k_write_memory_16(uint32_t addr, uint32_t val)
 			cart.banks[(addr & 0xe) >> 1] = (uint32_t)(cart.rom + ((val & 0xff) << 19));
 		break;
 	default:
-		printf("Unhandled memory write to %06x, value %04x\n", addr, val);
+		while(1) {printf("Unhandled 16-bit memory write to %06x, value %04x\n", addr, val);}
 		quit = 1;
 	}
 }
