@@ -2,11 +2,10 @@
 /* $Id$ */
 
 #include <kos.h>
-
+#include <malloc.h>
 #include "gen-emu.h"
 #include "cart.h"
 
-#include "sonic2.h"
 
 //#include "md5.h"
 
@@ -18,6 +17,13 @@
 
 cart_t cart;
 
+#define USE_SONIC2_H 1
+
+#if USE_SONIC2_H
+#include "sonic2.h"
+#endif
+
+//static uint8_t srom[1024 * 1024 * 2];
 
 uint32_t rom_load(char *name)
 {
@@ -27,30 +33,33 @@ uint32_t rom_load(char *name)
 //	MD5_CTX ctx;
 
 	printf("Loading rom %s ... ", name);
-memset((void*)&cart, 0, sizeof(cart_t));
-#if 0
+	memset((void*)&cart, 0, sizeof(cart_t));
+#if !USE_SONIC2_H
 	fd = fs_open(name, O_RDONLY);
+	if(fd == -1) {
+		while(1) { printf("fd was -1, fs failed to get internal handle before doing anything\n"); }
+	}
+	while(1) { printf("%d\n",fd); }
 	if (fd == 0) {
 		printf("rom_load(): fs_open() failed.\n");
 		goto error;
 	}
-#endif
 	/* Get file length. */
-//	len = fs_seek(fd, 0, SEEK_END);
-//	fs_seek(fd, 0, SEEK_SET);
-len = 1048576;
-rom = sonic2_rom;
-//		rom = malloc(1 * 1024 * 1024);
-//for(int i=0;i<len;i++) {
-//	rom[i] = sonic2_rom[i];
-//}
-#if 0
-	if (strstr(name, "sonic2") != NULL) {
+	len = fs_seek(fd, 0, SEEK_END);
+	while(1) {printf("%d\n", len);}
+	fs_seek(fd, 0, SEEK_SET);
+#else
+	len = 1048576;
+	rom = sonic2_rom;
+#endif
+
+#if !USE_SONIC2_H
+	if (strstr(name, ".bin") != NULL) {
 		/* Allocate ROM memory. */
-//		rom = malloc(len);
-		rom = malloc(5 * 1024 * 1024);
+		rom = malloc(len);
+//		rom = malloc(5 * 1024 * 1024);
 		if (rom == NULL) {
-			printf("rom_load(): malloc() failed.\n");
+			while(1) { printf("rom_load(): malloc() failed.\n"); }
 			goto error;
 		}
 
@@ -198,10 +207,12 @@ rom = sonic2_rom;
 	return 1;
 
 error:
+#if !USE_SONIC2_H
 	if (rom)
 		free(rom);
 	if (fd)
 		fs_close(fd);
+#endif
 	return 0;
 }
 
