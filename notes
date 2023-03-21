@@ -1,0 +1,1 @@
+ /opt/toolchains/dc/kos/utils/mkdcdisc.exe -e gen-emu.elf -o gen-emu.cdi -N -v 3
