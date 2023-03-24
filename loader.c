@@ -6,9 +6,9 @@
 #include "gen-emu.h"
 #include "cart.h"
 
-
-//#include "md5.h"
-
+#if 0
+#include "md5.h"
+#endif
 
 /* Super Street Fighter 2 Game IDs. */
 #define	SSF2_JP		"GM T-12043 -00"
@@ -17,36 +17,37 @@
 
 cart_t cart;
 
-#define USE_SONIC2_H 1
+#define USE_SONIC2_H 0
 
 #if USE_SONIC2_H
 #include "sonic2.h"
 #endif
 
-//static uint8_t srom[1024 * 1024 * 2];
-
 uint32_t rom_load(char *name)
 {
-	uint32_t fd, len, i;
+ file_t fd; uint32_t len, i;
 	uint8_t *rom = NULL;
+#if 0	
 	uint8 md5sum[16];
-//	MD5_CTX ctx;
-
+	MD5_CTX ctx;
+#endif
 	printf("Loading rom %s ... ", name);
-	memset((void*)&cart, 0, sizeof(cart_t));
+//	memset((void*)&cart, 0, sizeof(cart_t));
 #if !USE_SONIC2_H
 	fd = fs_open(name, O_RDONLY);
-	if(fd == -1) {
-		while(1) { printf("fd was -1, fs failed to get internal handle before doing anything\n"); }
+
+	if(fd < 1) {
+		printf("fd was %d\n", fd);
 	}
-	while(1) { printf("%d\n",fd); }
+
 	if (fd == 0) {
 		printf("rom_load(): fs_open() failed.\n");
 		goto error;
 	}
 	/* Get file length. */
 	len = fs_seek(fd, 0, SEEK_END);
-	while(1) {printf("%d\n", len);}
+	printf("%d\n", len);
+
 	fs_seek(fd, 0, SEEK_SET);
 #else
 	len = 1048576;
@@ -57,7 +58,6 @@ uint32_t rom_load(char *name)
 	if (strstr(name, ".bin") != NULL) {
 		/* Allocate ROM memory. */
 		rom = malloc(len);
-//		rom = malloc(5 * 1024 * 1024);
 		if (rom == NULL) {
 			while(1) { printf("rom_load(): malloc() failed.\n"); }
 			goto error;
@@ -86,7 +86,6 @@ uint32_t rom_load(char *name)
 
 			/* Allocate ROM memory. */
 			rom = malloc(len);
-//			rom = malloc(5 * 1024 * 1024);
 			if (rom == NULL) {
 				printf("rom_load(): malloc() failed.\n");
 				goto error;
@@ -194,9 +193,7 @@ uint32_t rom_load(char *name)
 #endif
 
 	printf("Cart details...\n");
-//	while(1){
-		printf("ROM Length: 0x%x (%d) bytes\n", cart.rom_len, cart.rom_len);
-	//}
+	printf("ROM Length: 0x%x (%d) bytes\n", cart.rom_len, cart.rom_len);
 #if 0	
 	if (cart.sram_len)
 		printf("RAM Length: 0x%x (%d) bytes%s\n", cart.sram_len, cart.sram_len,

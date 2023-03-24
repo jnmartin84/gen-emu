@@ -5,15 +5,11 @@
 
 #include "gen-emu.h"
 
-struct vdp_s
+struct __attribute__ ((packed, aligned(8))) vdp_s
 {
-	uint8_t vram[65536];
-	uint16_t cram[64];
-	uint16_t vsram[64];		/* Only first 40 used. rest are address padding. */
-	uint16_t dc_cram[64];	/* cram in dc format */
-	uint8_t regs[32];		/* Only first 24 used, rest are address padding. */
-
 	uint32_t control;
+	uint32_t unused32_0;
+
 	uint16_t *bga;
 	uint16_t *bgb;
 	uint16_t *wnd;
@@ -22,17 +18,29 @@ struct vdp_s
 	uint16_t status;
 	uint16_t scanline;
 	uint16_t hv;
-
 	uint16_t hs_off;
 	uint16_t addr;
+	uint16_t unused16_0;
+	uint16_t unused16_1;
+	uint16_t unused16_2;
+
 	uint8_t code;
 	uint8_t h_int_counter;
 	uint8_t write_pending;
 	uint8_t sc_width;
 	uint8_t sc_height;
 	uint8_t dis_cells;
-};
+	uint8_t sat_dirty;
+	uint8_t unused8_0;
 
+	uint8_t vram[65536];
+	uint8_t regs[32];		/* Only first 24 used, rest are address padding. */
+
+	uint16_t vsram[64];		/* Only first 40 used. rest are address padding. */
+
+	uint16_t cram[64];
+	uint16_t dc_cram[64];	/* cram in dc format */
+};
 
 uint16_t vdp_control_read(void);
 uint16_t vdp_data_read(void);

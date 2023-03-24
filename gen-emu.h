@@ -1,5 +1,7 @@
 #ifndef _GEN_EMU_H_
 #define _GEN_EMU_H_
+#include <malloc.h>
+
 #include <stdint.h>
 #if 0
 typedef signed char					sint8_t;
@@ -39,7 +41,7 @@ extern uint32_t endswapl(uint32_t);
 	__asm__ volatile ("swap.b %0,%0" : "+r" (x))
 
 #include <dc/minifont.h>
-
+#if 0
 #undef printf
 #define printf(...) {\
 char str[256];\
@@ -54,6 +56,6 @@ char str[256];\
 sprintf(str,__VA_ARGS__);\
 minifont_draw_str(vram_s + 640*20 + 20, 640, str);\
 }
-
+#endif
 
 #endif /* _GEN_EMU_H_ */

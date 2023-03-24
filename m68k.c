@@ -12,9 +12,9 @@
 
 #include "vdp.h"
 #include "input.h"
-
-uint8_t m68k_ram[65536];
-uint16_t *m68k_ram16 = (uint16_t *)m68k_ram;
+uint64_t aligned_ram[8192];
+uint8_t *m68k_ram = (uint8_t *)aligned_ram;
+uint16_t *m68k_ram16 = (uint16_t *)aligned_ram;
 uint8_t bank_sram = 0;
 
 

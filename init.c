@@ -20,7 +20,7 @@ pvr_init_params_t pvr_params = {
 void gen_init(void)
 {
 	pvr_init(&pvr_params);
-	pvr_mem_reset();
+//	pvr_mem_reset();
 	vid_border_color(0, 0, 255);
 	pvr_set_bg_color(0, 0, 1.0f);
 
