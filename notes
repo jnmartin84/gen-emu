@@ -1,4 +1,19 @@
- /opt/toolchains/dc/kos/utils/mkdcdisc.exe -e gen-emu.elf -o gen-emu.cdi -N -v 3
+ need to patch mkdcdisc so it builds ISO with files correctly...
+ --- a/src/main.cpp
++++ b/src/main.cpp
+@@ -241,7 +241,7 @@ static bool gather_files(const std::filesystem::path& out) {
+     if(OPTS.count("file")) {
+         for(std::filesystem::path file: OPTS["file"]) {
+             if(std::filesystem::exists(file)) {
+-                std::filesystem::copy(file, out / file.stem());
++                std::filesystem::copy(file, out / file /*.stem()*/);
+             } else {
+                 std::cerr << "No such file: " << file.string() << std::endl;
+                 return false;
+
+ 
+ 
+ mkdcdisc.exe -e gen-emu.elf -o gen-emu.cdi -N -v 3
 
 
 
