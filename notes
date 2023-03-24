@@ -6,7 +6,7 @@
          for(std::filesystem::path file: OPTS["file"]) {
              if(std::filesystem::exists(file)) {
 -                std::filesystem::copy(file, out / file.stem());
-+                std::filesystem::copy(file, out / file /*.stem()*/);
++                std::filesystem::copy(file, out / file);
              } else {
                  std::cerr << "No such file: " << file.string() << std::endl;
                  return false;
