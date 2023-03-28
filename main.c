@@ -100,7 +100,7 @@ while(1) {
 }
 //uint32_t field_count = 0;
 char str[256];
-
+extern uint8_t skip[2][2][40*28];
 void run_one_field(void)
 {
 //	static int cnt;
@@ -117,7 +117,10 @@ void run_one_field(void)
 
 	}
 	#if 1
-if (field_skip == 0) {
+if (1) // (field_skip == 0)
+	{
+#if 0
+
 for(line=0;line<224;line+=4) {
 //			if (line < 224) {
 			/* render scanline to vram*/
@@ -128,11 +131,16 @@ for(line=0;line<224;line+=4) {
 //		}
 
 }
-
+#endif
 	/* Render debug cram display. */
 #if 0
 	vdp_render_cram();
 #endif
+memset(skip,1,4*40*28);
+		vdp_render_full_plane(1,0);
+		vdp_render_full_plane(0,0);
+		vdp_render_full_plane(1,1);
+		vdp_render_full_plane(0,1);
 
 	/* Submit whole screen to pvr. */
 	do_frame();

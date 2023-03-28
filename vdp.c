@@ -21,9 +21,14 @@ pvr_poly_hdr_t cram_hdr;
 pvr_ptr_t cram_txr;
 
 
-pvr_poly_hdr_t tile_hdr[2][40*28];
-pvr_ptr_t tile_txr[2][40*28];
+//pvr_poly_hdr_t tile_hdr;
+//pvr_ptr_t tile_txr;
 
+// priority plane tile
+pvr_poly_hdr_t tile_hdr[2][2][40*28];
+pvr_ptr_t tile_txr[2][2][40*28];
+uint8_t skip[2][2][40*28];
+uint32_t fill[320];
 #endif
 uint8_t display_ptr;
 
@@ -31,14 +36,14 @@ uint8_t nt_cells[4] = { 32, 64, 0, 128 };
 uint8_t mode_cells[4] = { 32, 40, 0, 40 };
 #define SWAP_WORDS(x) __asm__ volatile ("swap.w %0, %0" : "+r" (x))
 
+#define get_color_argb1555(r,g,b,a) ((uint16_t)(((a&1)<<15) | ((r>>3)<<10) | ((g>>3)<<5) | (b>>3)))
 
-static uint16_t  ocr_vram[8192];
+static uint16_t  ocr_vram[8192];//*ocr_vram = (uint16_t *)0x7c002000;
 
 
 void vdp_init(void)
 {
 #if PVR
-	pvr_poly_cxt_t cxt;
 	int filters;
 //debug = 0;
 #if 0
@@ -46,43 +51,17 @@ void vdp_init(void)
 #else
 	filters = PVR_FILTER_NONE;
 #endif
+pvr_set_pal_format(PVR_PAL_ARGB1555);
 
-	/* Allocate and build display texture data */
-	disp_txr[0] = pvr_mem_malloc(512 * 256 * 2);
-	disp_txr[1] = pvr_mem_malloc(512 * 256 * 2);
-
-	pvr_set_pal_format(PVR_PAL_RGB565);
-
-	pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY,
-		PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED,
-		512, 256, disp_txr[0], filters);
-	pvr_poly_compile(&disp_hdr[0], &cxt);
-	pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY,
-		PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED,
-		512, 256, disp_txr[1], filters);
-	pvr_poly_compile(&disp_hdr[1], &cxt);
-	display_txr = disp_txr[0];
-	display_ptr = 1;
-
-
-	/* Allocate and build cram texture data */
-	cram_txr = pvr_mem_malloc(8 * 8 * 2);
-
-	pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY,
-		PVR_TXRFMT_RGB565 | PVR_TXRFMT_NONTWIDDLED,
-		8, 8, cram_txr, PVR_FILTER_NONE);
-	pvr_poly_compile(&cram_hdr, &cxt);
+for(int pr=0;pr<2;pr++) {
 
 for(int p=0;p<2;p++) {
 for(int h=0;h<224/8;h++) {
 	for(int w=0;w<320/8;w++) {
-    tile_txr[p][(h*40)+w] = pvr_mem_malloc(32);
-	pvr_poly_cxt_txr(&cxt, PVR_LIST_OP_POLY,
-		PVR_TXRFMT_PAL4BPP ,
-		8, 8, tile_txr[p][(h*40)+w], PVR_FILTER_NONE);
-	pvr_poly_compile(&tile_hdr, &cxt);
+    tile_txr[pr][p][(h*40)+w] = pvr_mem_malloc(32);
 
 	}
+}
 }
 }
 #endif
@@ -90,6 +69,7 @@ for(int h=0;h<224/8;h++) {
 
 }
 
+#if 1
 uint16_t vdp_control_read(void)
 {
 	uint16_t ret = 0x3500;
@@ -114,6 +94,15 @@ void vdp_control_write(uint16_t val)
 	if((val & 0xc000) == 0x8000) {
 		if(!vdp.write_pending) {
 			vdp.regs[(val >> 8) & 0x1f] = (val & 0xff);
+		if((val>>8)&0x1f == 7) {
+			uint32 fv = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
+				/* Prefill the scanline with the backdrop color. */
+	for (int i = 0; i < 320; i++)
+		fill[i] = fv;
+
+		}
+			
+			
 			switch((val >> 8) & 0x1f) {
 			case 0x02:	/* BGA */
 				vdp.bga = (uint16_t *)(vdp.vram + ((val & 0x38) << 10));
@@ -183,6 +172,7 @@ void vdp_control_write(uint16_t val)
 							vdp.addr += r15;
 							src_off += 1;
 						} while(--len);
+						
 						do {
 							if(!(start_vaddr & 0x01)) {
 								SWAPBYTES16(((uint16_t *)vdp.vram)[start_vaddr >> 1]);
@@ -209,28 +199,54 @@ void vdp_control_write(uint16_t val)
 						/* cram */
 						do {
 							uint16_t laddr = start_vaddr >> 1;
-							val = vdp.cram[(start_vaddr>>1)];
+							uint8_t r,g,b,a;
+							val = vdp.cram[laddr];
 							SWAPBYTES16(val);
-							vdp.dc_cram[laddr] =
+							a = (laddr%16) != 0;
+							r = (val & 0x000e) << 4;
+							g = ((val>>4) & 0x000e) << 4;
+							b = ((val>>8) & 0x000e) << 4;
+							vdp.dc_cram[laddr] = get_color_argb1555(r,g,b,a);
 								//(((len%16 == 0) ? 0 : 1) << 15)
 								//|
-								(((val & 0x000e) << 12) |
-								 ((val & 0x00e0) << 3) |
-								 ((val & 0x0e00) >> 7));
-							pvr_set_pal_entry(laddr, vdp.dc_cram[laddr]);
+////								(((val & 0x000e) << 12) |
+	//							 ((val & 0x00e0) << 3) |
+		//						 ((val & 0x0e00) >> 7));
+		                    pvr_set_pal_entry(laddr, get_color_argb1555(r,g,b,a));
 							start_vaddr += vdp.regs[15];
 							src_off += 1;
+#if 0
+							if(laddr == vdp.regs[7]) {
+											uint32 fv = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
+				/* Prefill the scanline with the backdrop color. */
+	for (int i = 0; i < 320; i++)
+		fill[i] = fv;
 
+							}
+#endif
+							//if(vdp.addr > 0x7f)
 							if(laddr > 0x3f)
 								break;
 						} while(--len_copy);
+
+
+#if 0
+						for(len = 0; len < 64; len++)
+							vdp.dc_cram[len] = 
+								//(((len%16 == 0) ? 0 : 1) << 15)
+								//|
+								(((vdp.cram[len] & 0x000e) << 12) |
+								 ((vdp.cram[len] & 0x00e0) << 3) |
+								 ((vdp.cram[len] & 0x0e00) >> 7));
+						    //pvr_set_pal_entry(len, vdp.dc_cram[len]);
+#endif
 					} break;
 					case 0x05: {
 						uint16_t start_vaddr = vdp.addr;
 						uint16_t len_copy = len;
 						/* vsram */
 						do {
-							vdp.vsram[vdp.addr >> 1] = src_mem[src_off & src_mask];
+							vdp.vsram[vdp.addr >> 1] = src_mem[src_off & src_mask];//val;
 							vdp.addr += vdp.regs[15];
 							src_off += 1;
 
@@ -243,6 +259,7 @@ void vdp_control_write(uint16_t val)
 							start_vaddr += vdp.regs[15];
 						} while(--len_copy);
 					}	break;
+						
 					default:
 						printf("68K->VDP DMA Error, code %d.", vdp.code);
 					}
@@ -296,13 +313,20 @@ void vdp_data_write(uint16_t val)
 		break;
 	case 0x03:
 		uint32_t cram_addr = (vdp.addr >> 1) & 0x3f;
+		uint8_t r,g,b,a;
+//		SWAPBYTES16(val);
 		vdp.cram[cram_addr] = val;
-		vdp.dc_cram[cram_addr] = 
             //((vdp.addr >> 1)%16 == 0 ? 0 : 1) << 15 | 
-			(((val & 0x000e) << 12) |
-			 ((val & 0x00e0) << 3) |
-			 ((val & 0x0e00) >> 7));
-		    pvr_set_pal_entry((vdp.addr >> 1) & 0x3f, vdp.dc_cram[(vdp.addr >> 1) & 0x3f]);
+			//(((val & 0x000e) << 12) |
+			 //((val & 0x00e0) << 3) |
+			 //((val & 0x0e00) >> 7));
+//		    pvr_set_pal_entry((vdp.addr >> 1) & 0x3f, vdp.dc_cram[(vdp.addr >> 1) & 0x3f]);
+		a = (cram_addr%16) != 0;
+		r = (val & 0x000e)<<4;
+		g = ((val & 0x00e0)>>4)<<4;
+		b = ((val & 0x0e00)>>8)<<4;
+		vdp.dc_cram[cram_addr] = get_color_argb1555(r,g,b,a);
+		pvr_set_pal_entry(cram_addr, get_color_argb1555(r,g,b,a));		
 		vdp.addr += 2;
 		break;
 	case 0x05:
@@ -329,6 +353,19 @@ void vdp_data_write(uint16_t val)
 				uint16_t len = (vdp.regs[20] << 8) | vdp.regs[19];
 				uint16_t addr = (vdp.regs[22] << 8) | vdp.regs[21];
 
+#if 0
+				if (vdp.regs[15] == 2) {
+					printf("got there\n");
+					printf("got there\n");
+					printf("got there\n");
+					printf("got there\n");
+					printf("got there\n");
+					memcpy(vdp.vram + vdp.addr, vdp.vram + addr, len*2);
+					vdp.addr += (len*2);
+					
+				}
+				else 
+#endif
 				{
 				do {
 					vdp.vram[vdp.addr] = vdp.vram[addr++];
@@ -396,7 +433,7 @@ void vdp_interrupt(int line)
 
 	vdp.h_int_counter--;
 }
-
+#endif 
 void vdp_render_cram(void)
 {
 	sq_cpy(cram_txr, vdp.dc_cram, 128);
@@ -426,78 +463,88 @@ static uint16_t pix_byte_map[4][32] = {
     }
 };
 
+#define TWIDDLEIT 1
+void vdp_render_full_plane(int plane, int priority) {
+//	for(int plane=1;plane>-1;plane--) {
+		uint16_t *p;
 
-//		vdp_render_plane(line+2, 1, 0);
-//		vdp_render_plane(line+2, 0, 0);
-void vdp_render_full_plane(int priority) {
+		p = plane ? vdp.bgb : vdp.bga;
 
-/*
+		for(int y=0;y<28;y++) {
+			int line = y*8;
+			int row, pixrow;
+			int16_t hscroll = 0;
+			int8_t  col_off, pix_off;
 
-// Linear/iterative twiddling algorithm from Marcus' tatest 
-#define TWIDTAB(x) ( (x&1)|((x&2)<<1)|((x&4)<<2)|((x&8)<<3)|((x&16)<<4)| \
-                     ((x&32)<<5)|((x&64)<<6)|((x&128)<<7)|((x&256)<<8)|((x&512)<<9) )
-#define TWIDOUT(x, y) ( TWIDTAB((y)) | (TWIDTAB((x)) << 1) )
+			switch(vdp.regs[11] & 0x03) {
+			case 0x0:
+				hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + (plane ? 2 : 0)) >> 1];
+				break;
+			case 0x1:
+				hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + ((line & 0x7) << 1) + (plane ? 2 : 0)) >> 1];
+				break;
+			case 0x2:
+				hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + ((line & ~0x7) << 1) + (plane ? 2 : 0)) >> 1];
+				break;
+			case 0x3:
+				hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + (line << 2) + (plane ? 2 : 0)) >> 1];
+				break;
+			}
 
-const uint32_t min = 8;
-const uint32_t mask = 8 - 1;
-uint16_t *vtex = tile_txr;
-uint8_t *pixels = (vdp.vram + ((name_ent & 0x7ff) << 5));
-for(uint32_t y = 0; y < 8; y += 2) {
-		uint32_t yout = y;
+			hscroll = (0x400 - hscroll) & 0x3ff;
+			col_off = hscroll >> 3;
+			pix_off = hscroll & 0x7;
 
-	for(uint32_t x = 0; x < 8; x += 2) {
-		vtex[TWIDOUT((x & mask) / 2, (yout & mask) / 2) + (x / min + yout / min)*min * min / 4] =
-		(pixels[(x + y * 8) >> 1] & 15) | ((pixels[(x + (y + 1) * 8) >> 1] & 15) << 4) |
-		((pixels[(x + y * 8) >> 1] >> 4) << 8) | ((pixels[(x + (y + 1) * 8) >> 1] >> 4) << 12);
-	}
-}
+			if ((vdp.regs[11] & 0x04) == 0)
+				line = (line + (vdp.vsram[(plane ? 1 : 0)] & 0x3ff)) % (vdp.sc_height << 3);
 
+			row = (line / 8) * vdp.sc_width;
+			pixrow = line % 8;
 
+			for(int x=0;x<(vdp.dis_cells);x++) {
+				uint16_t name_ent = p[row + ((col_off + ((pix_off + (x*8)) >> 3)) % vdp.sc_width)];
 
-*/
-for(int plane=1;plane>-1;plane--) {
-	uint16_t *p;
+//				if ((name_ent >> 15) != priority) {
+//				skip[priority][plane][(y*40)+x] = 1;
+//				continue;
+//				}
+				if ((name_ent >> 15) == priority) {
+					pvr_poly_cxt_t cxt;
+					skip[priority][plane][(y*40)+x] = 0;
+					uint16_t *tex = tile_txr[priority][plane][(y*40)+x];
+					uint8_t *pixels = (vdp.vram + ((name_ent & 0x7ff) << 5));
+					int pal = (name_ent >> 9) & 0x30;
 
-	p = plane ? vdp.bgb : vdp.bga;
+					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(pal>>4),
+					8, 8, tile_txr[priority][plane][(y*40)+x], PVR_FILTER_NONE);
+					pvr_poly_compile(&tile_hdr[priority][plane][(y*40)+x], &cxt);
+					cxt.gen.alpha = 1;
+					cxt.blend.src = PVR_BLEND_DESTCOLOR;
+					cxt.blend.dst = PVR_BLEND_ONE;
 
-for(int y=0;y<224;y+=8) {
-	int line;
-	int row, pixrow, i, j;
-	int16_t hscroll = 0;
-	int8_t  col_off, pix_off, pix_tmp;
+#if TWIDDLEIT
+#define TWIDTAB(xx) ( (xx&1)|((xx&2)<<1)|((xx&4)<<2)|((xx&8)<<3)|((xx&16)<<4)| \
+                     ((xx&32)<<5)|((xx&64)<<6)|((xx&128)<<7)|((xx&256)<<8)|((xx&512)<<9) )
+#define TWIDOUT(xx, yy) ( TWIDTAB((yy)) | (TWIDTAB((xx)) << 1) )
 
-	switch(vdp.regs[11] & 0x03) {
-	case 0x0:
-		hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + (plane ? 2 : 0)) >> 1];
-		break;
-	case 0x1:
-		hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + ((line & 0x7) << 1) + (plane ? 2 : 0)) >> 1];
-		break;
-	case 0x2:
-		hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + ((line & ~0x7) << 1) + (plane ? 2 : 0)) >> 1];
-		break;
-	case 0x3:
-		hscroll = ((uint16_t *)vdp.vram)[(vdp.hs_off + (line << 2) + (plane ? 2 : 0)) >> 1];
-		break;
-	}
+					for(int i = 0; i < 8; i += 2) {
 
-	hscroll = (0x400 - hscroll) & 0x3ff;
-	col_off = hscroll >> 3;
-	pix_off = hscroll & 0x7;
-	pix_tmp = pix_off;
+						int yout = i;
 
-	if ((vdp.regs[11] & 0x04) == 0)
-		line = (line + (vdp.vsram[(plane ? 1 : 0)] & 0x3ff)) % (vdp.sc_height << 3);
-
-	row = (line / 8) * vdp.sc_width;
-	pixrow = line % 8;
-
-	for(int x=0;x<(vdp.dis_cells<<3);x++) {
-		
-	}
-}
-}
-
+						for(int j = 0; j < 8; j += 2) {
+							tex[TWIDOUT((j & 7) / 2, (yout & 7) / 2) + (j / 8 + yout / 8)*8 * 8 / 4] =
+							(pixels[(j + i * 8) >> 1] & 15) | ((pixels[(j + (i + 1) * 8) >> 1] & 15) << 4) |
+							((pixels[(j + i * 8) >> 1] >> 4) << 8) | ((pixels[(j + (i + 1) * 8) >> 1] >> 4) << 12);
+						}
+					}
+#else					
+					pvr_txr_load(pixels, tex, 64);
+					//memcpy(tex,pixels,32);
+#endif
+				}
+			}
+		}
+//	}
 }
 
 void vdp_render_plane(int line, int plane, int priority)
@@ -549,7 +596,33 @@ void vdp_render_plane(int line, int plane, int priority)
 			else
 				data = *(uint32_t *)(vdp.vram + ((name_ent & 0x7ff) << 5) + (pixrow * 4));
 			SWAP_WORDS(data);
+#if 0
+if(line == 108) {
+//	if (i == 4) 
+{
+//		sq_cpy(tile_txr, (vdp.vram + ((name_ent & 0x7ff) << 5)), 32);
+// twiddling a 4bpp 8*8 tile from sh4 to pvr mem
 
+/* Linear/iterative twiddling algorithm from Marcus' tatest */
+#define TWIDTAB(x) ( (x&1)|((x&2)<<1)|((x&4)<<2)|((x&8)<<3)|((x&16)<<4)| \
+                     ((x&32)<<5)|((x&64)<<6)|((x&128)<<7)|((x&256)<<8)|((x&512)<<9) )
+#define TWIDOUT(x, y) ( TWIDTAB((y)) | (TWIDTAB((x)) << 1) )
+
+const uint32_t min = 8;
+const uint32_t mask = 8 - 1;
+uint16_t *vtex = tile_txr;
+uint8_t *pixels = (vdp.vram + ((name_ent & 0x7ff) << 5));
+for(uint32_t y = 0; y < 8; y += 2) {
+		uint32_t yout = y;
+
+	for(uint32_t x = 0; x < 8; x += 2) {
+		vtex[TWIDOUT((x & mask) / 2, (yout & mask) / 2) + (x / min + yout / min)*min * min / 4] =
+		(pixels[(x + y * 8) >> 1] & 15) | ((pixels[(x + (y + 1) * 8) >> 1] & 15) << 4) |
+		((pixels[(x + y * 8) >> 1] >> 4) << 8) | ((pixels[(x + (y + 1) * 8) >> 1] >> 4) << 12);
+	}
+}	}
+}
+#endif
 			if ((name_ent >> 11) & 0x1) {
 				for (j = 0; j < 8; j++) {
 					pixel = data & 0x0f;
@@ -878,12 +951,16 @@ end:
 void vdp_render_scanline(int line)
 {
 	int i;
-	uint32_t fill = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
+//	uint32_t fill = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
 	/* Prefill the scanline with the backdrop color. */
-	for (i = 0; i < (vdp.sc_width * 8); i++)
-		((uint32_t*)ocr_vram)[i] = fill;
+//	for (i = 0; i < (vdp.sc_width * 8); i++)
+//		((uint32_t*)ocr_vram)[i] = fill;
+
+	memcpy((void*)ocr_vram, fill, 640);
+	//memcpy( ((void*)ocr_vram) + 1024, fill, 640);
 
 	if (vdp.regs[1] & 0x40) {
+//		vdp_render_full_plane(0);
 		vdp_render_plane(line, 1, 0);
 		vdp_render_plane(line, 0, 0);
 		vdp_render_sprites2(line, 0);
@@ -892,5 +969,24 @@ void vdp_render_scanline(int line)
 		vdp_render_sprites2(line, 1);
 	}
 
-	sq_cpy((((uint16_t *)display_txr) + (line * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 ));
+	sq_cpy((((uint16_t *)display_txr) + ((line/*>>2*/) * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 )); //2048);////(vdp.dis_cells * 8  * 2 )*2);
+//	sq_cpy((((uint16_t *)display_txr) + ((line+1) * 512)), ((void*)ocr_vram)+1024, (vdp.dis_cells * 8  * 2 )*2);
+
+#if 0
+	if (vdp.regs[1] & 0x40) {
+		vdp_render_plane(line+2, 1, 0);
+		vdp_render_plane(line+2, 0, 0);
+		vdp_render_sprites(line+2, 0);
+		vdp_render_plane(line+2, 1, 1);
+		vdp_render_plane(line+2, 0, 1);
+		vdp_render_sprites(line+2, 1);
+	}
+
+	sq_cpy((((uint16_t *)display_txr) + ((line+2) * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 ));
+#endif
+//	sq_cpy((((uint16_t *)display_txr) + ((line+1) * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 ));
+	//memcpy((((uint16_t *)display_txr) + (line * 512)), ocr_vram, (vdp.dis_cells * 8 * 2));
+/*for(int x=0;x<(vdp.sc_width * 8);x++) {
+	vram_s[line * 640 + x] = ocr_vram[x];
+}*/
 }

@@ -17,7 +17,7 @@
 
 cart_t cart;
 
-#define USE_SONIC2_H 0
+#define USE_SONIC2_H 1
 
 #if USE_SONIC2_H
 #include "sonic2.h"
