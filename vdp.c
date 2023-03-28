@@ -215,12 +215,9 @@ void vdp_control_write(uint16_t val)
 		                    pvr_set_pal_entry(laddr, get_color_argb1555(r,g,b,a));
 							start_vaddr += vdp.regs[15];
 							src_off += 1;
-#if 0
+#if 1
 							if(laddr == vdp.regs[7]) {
-											uint32 fv = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
-				/* Prefill the scanline with the backdrop color. */
-	for (int i = 0; i < 320; i++)
-		fill[i] = fv;
+	pvr_set_bg_color(r / 255.0f, g / 255.0f, b / 255.0f);
 
 							}
 #endif
@@ -328,6 +325,13 @@ void vdp_data_write(uint16_t val)
 		vdp.dc_cram[cram_addr] = get_color_argb1555(r,g,b,a);
 		pvr_set_pal_entry(cram_addr, get_color_argb1555(r,g,b,a));		
 		vdp.addr += 2;
+#if 1
+							if(cram_addr == vdp.regs[7]) {
+	pvr_set_bg_color(r / 255.0f, g / 255.0f, b / 255.0f);
+
+							}
+#endif
+
 		break;
 	case 0x05:
 		vdp.vsram[(vdp.addr >> 1) & 0x3f] = val;
@@ -464,8 +468,8 @@ static uint16_t pix_byte_map[4][32] = {
 };
 
 #define TWIDDLEIT 1
-void vdp_render_full_plane(int plane, int priority) {
-//	for(int plane=1;plane>-1;plane--) {
+void vdp_render_full_plane(/*int plane, */int priority) {
+	for(int plane=1;plane>-1;plane--) {
 		uint16_t *p;
 
 		p = plane ? vdp.bgb : vdp.bga;
@@ -520,7 +524,7 @@ void vdp_render_full_plane(int plane, int priority) {
 					pvr_poly_compile(&tile_hdr[priority][plane][(y*40)+x], &cxt);
 					cxt.gen.alpha = 1;
 					cxt.blend.src = PVR_BLEND_DESTCOLOR;
-					cxt.blend.dst = PVR_BLEND_ONE;
+					cxt.blend.dst = PVR_BLEND_ZERO;
 
 #if TWIDDLEIT
 #define TWIDTAB(xx) ( (xx&1)|((xx&2)<<1)|((xx&4)<<2)|((xx&8)<<3)|((xx&16)<<4)| \
@@ -544,7 +548,7 @@ void vdp_render_full_plane(int plane, int priority) {
 				}
 			}
 		}
-//	}
+	}
 }
 
 void vdp_render_plane(int line, int plane, int priority)

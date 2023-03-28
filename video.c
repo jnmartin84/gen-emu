@@ -85,8 +85,8 @@ for(int ty=0;ty<224/8;ty++) {
 		pvr_prim(&tile_hdr[tpr][tp][(ty*40)+tx], sizeof(pvr_poly_hdr_t));
 
 		vert.flags = PVR_CMD_VERTEX;
-		vert.x = (tx*8);
-		vert.y = (ty*8)+8;
+		vert.x = (tx*16);
+		vert.y = (ty*16)+16;
 		vert.u = 0.0f;
 		vert.v = 1.0f;
 //		vert.z = (0.0 - (float)tpr) + (tp == 1 ? 0.0 : -1.0);
@@ -110,18 +110,18 @@ if(tpr == 1) {
 //		vert.z = tpr + (2-tp);
 	
 	pvr_prim(&vert, sizeof(vert));
-		vert.y = (ty*8);
+		vert.y = (ty*16);
 		vert.v = 0.0f;
 		pvr_prim(&vert, sizeof(vert));
 
-		vert.x = (tx*8) + 8;
-		vert.y = (ty*8) + 8;
+		vert.x = (tx*16) + 16;
+		vert.y = (ty*16) + 16;
 		vert.u = 1.0f;//((vdp.regs[12] & 0x01) ? 320.0f : 256.0f)/512.0f;
 		vert.v = 1.0f;//240.0f/256.0f;
 		pvr_prim(&vert, sizeof(vert));
 
 		vert.flags = PVR_CMD_VERTEX_EOL;
-		vert.y = (ty*8);
+		vert.y = (ty*16);
 		vert.v = 0.0f;
 		pvr_prim(&vert, sizeof(vert));
 		}

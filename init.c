@@ -22,7 +22,7 @@ void gen_init(void)
 	pvr_init(&pvr_params);
 //	pvr_mem_reset();
 	vid_border_color(0, 0, 255);
-	pvr_set_bg_color(0, 0, 1.0f);
+//	pvr_set_bg_color(0, 0, 1.0f);
 
 	vdp_init();
 	ctlr_init();
