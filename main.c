@@ -155,11 +155,12 @@ memset(skip,1,4*40*28);
 //	if ((cnt % 60) == 0)
 //		printf("%d\n",cnt);
 end_time = rtc_unix_secs();
+#if 0
 	total_cycles = (127856 * field_count/**FIELD_SKIP*/) ;
 	double emulated_MHz = (total_cycles / 1048576.0) / (end_time - start_time);
 sprintf(str, "emulated mhz: %f", emulated_MHz);
 minifont_draw_str(vram_s + 640*20 + 20, 640, str);
 		sprintf(str, "new all-time max tilenum %08x (%d)\n", alltime_maxtn, alltime_maxtn);
 		minifont_draw_str(vram_s + 640*40 + 20, 640, str);
-
+#endif
 }

@@ -564,7 +564,8 @@ void vdp_render_pvr_plane(/*int plane, */int priority) {
 					}
 					// finished loading tile into texture here
 					skip[priority][plane][(y*40)+x] = 0;
-					//if((name_ent & 0x7ff) != last_tn[priority][plane][(y*40)+x]) {
+					if((name_ent & 0x7ff) != last_tn[priority][plane][(y*40)+x]) {
+					last_tn[priority][plane][(y*40)+x] = (name_ent & 0x7ff);
 					pvr_poly_cxt_t cxt;
 					last_tn[priority][plane][(y*40)+x] = (name_ent & 0x7ff);
 					int pal = (name_ent >> 9) & 0x30;
@@ -577,10 +578,11 @@ void vdp_render_pvr_plane(/*int plane, */int priority) {
 					cxt.blend.src = PVR_BLEND_DESTCOLOR;
 					cxt.blend.dst = PVR_BLEND_ZERO;					
 					hf[priority][plane][(y*40)+x] = hft;
+					}
 				}
-				if(alltime_maxtn < (name_ent & 0x7ff)) {
-					alltime_maxtn = (name_ent & 0x7ff);
-				}
+//				if(alltime_maxtn < (name_ent & 0x7ff)) {
+//					alltime_maxtn = (name_ent & 0x7ff);
+//				}
 			}
 		}
 	}

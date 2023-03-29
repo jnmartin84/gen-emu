@@ -123,22 +123,22 @@ void do_frame()
 				sx = (spr_ent_bot & 0x000003FF)-128;		
 				for(int h=0;h<sh;h++) {
 				for(int v=0;v<sv;v++) {
-	//				if(svf) {
-	//					if(shf) {
-	//						pvr_prim(&sprite_hdr[tpr][si][((sv-v)*sh)+(sh-h)], sizeof(pvr_poly_hdr_t));
-	//					}
-	//					else {
-	//						pvr_prim(&sprite_hdr[tpr][si][((sv-v)*sh)+h], sizeof(pvr_poly_hdr_t));
-	//					}
-	//				}
-	//				else {
-	//					if(shf) {
-	//						pvr_prim(&sprite_hdr[tpr][si][(v*sh)+(sh-h)], sizeof(pvr_poly_hdr_t));
-	//					}
-	//					else {
+					if(svf) {
+						if(shf) {
+							pvr_prim(&sprite_hdr[tpr][si][((sv-v)*sh)+(sh-h)], sizeof(pvr_poly_hdr_t));
+						}
+						else {
+							pvr_prim(&sprite_hdr[tpr][si][((sv-v)*sh)+h], sizeof(pvr_poly_hdr_t));
+						}
+					}
+					else {
+						if(shf) {
+							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+(sh-h)], sizeof(pvr_poly_hdr_t));
+						}
+						else {
 							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+h], sizeof(pvr_poly_hdr_t));
-	//					}
-	//				}
+						}
+					}
 					vert.flags = PVR_CMD_VERTEX;
 					vert.x = (sx*2) + (h*16);
 					vert.y = (sy*2) + (v*16) + (16);
