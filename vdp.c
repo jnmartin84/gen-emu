@@ -10,7 +10,7 @@
 
 extern uint16_t *m68k_ram16;
 #define PVR 1
-
+uint32_t alltime_maxtn=0;
 struct vdp_s vdp;
 
 #if PVR
@@ -28,7 +28,16 @@ pvr_ptr_t cram_txr;
 pvr_poly_hdr_t tile_hdr[2][2][40*28];
 pvr_ptr_t tile_txr[2][2][40*28];
 uint8_t skip[2][2][40*28];
-uint32_t fill[320];
+uint8_t hf[2][2][40*28];
+uint8_t last_tn[2][2][40*28];
+uint8_t tn_used[4096] = {0};
+pvr_ptr_t tn_ptr[4096];// = {0};
+uint8_t sprite_used[2][80];
+pvr_ptr_t sprite_ptr[2][80][4*4];
+pvr_poly_hdr_t sprite_hdr[2][80][4*4];
+pvr_poly_cxt_t sprite_cxt[2][80][4*4];
+int8_t sprnum[2][80] = {{-1}};
+
 #endif
 uint8_t display_ptr;
 
@@ -52,7 +61,7 @@ void vdp_init(void)
 	filters = PVR_FILTER_NONE;
 #endif
 pvr_set_pal_format(PVR_PAL_ARGB1555);
-
+memset(last_tn,-1,4*40*28);
 for(int pr=0;pr<2;pr++) {
 
 for(int p=0;p<2;p++) {
@@ -63,6 +72,15 @@ for(int h=0;h<224/8;h++) {
 	}
 }
 }
+}
+for(int i=0;i<4096;i++) {
+		tn_ptr[i] = pvr_mem_malloc(32);
+}
+for(int i=0;i<80;i++) {
+	for(int j=0;j<16;j++) {
+	sprite_ptr[0][i][j] = pvr_mem_malloc(32);
+	sprite_ptr[1][i][j] = pvr_mem_malloc(32);
+	}
 }
 #endif
     vdp.sat_dirty = 1;
@@ -95,10 +113,12 @@ void vdp_control_write(uint16_t val)
 		if(!vdp.write_pending) {
 			vdp.regs[(val >> 8) & 0x1f] = (val & 0xff);
 		if((val>>8)&0x1f == 7) {
-			uint32 fv = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
-				/* Prefill the scanline with the backdrop color. */
-	for (int i = 0; i < 320; i++)
-		fill[i] = fv;
+			uint16_t col = vdp.dc_cram[vdp.regs[7] & 0x3f];
+			int r,g,b;
+			r = ((col >> 10) & 0x1f)<<3;
+			g = ((col >> 5) & 0x1f)<<3;
+			b = ((col >> 0) & 0x1f)<<3;
+	pvr_set_bg_color(r / 255.0f, g / 255.0f, b / 255.0f);
 
 		}
 			
@@ -443,7 +463,7 @@ void vdp_render_cram(void)
 	sq_cpy(cram_txr, vdp.dc_cram, 128);
 }
 
-
+uint16_t tmptex[32];
 static uint16_t pix_byte_map[4][32] = {
     {   1,   1,   0,   0,   3,   3,   2,   2,
        33,  33,  32,  32,  35,  35,  34,  34,
@@ -468,7 +488,9 @@ static uint16_t pix_byte_map[4][32] = {
 };
 
 #define TWIDDLEIT 1
-void vdp_render_full_plane(/*int plane, */int priority) {
+uint32_t data_copy[8];
+void vdp_render_pvr_plane(/*int plane, */int priority) {
+	memset(tn_used,0,4096);
 	for(int plane=1;plane>-1;plane--) {
 		uint16_t *p;
 
@@ -476,7 +498,7 @@ void vdp_render_full_plane(/*int plane, */int priority) {
 
 		for(int y=0;y<28;y++) {
 			int line = y*8;
-			int row, pixrow;
+			int row;//, pixrow;
 			int16_t hscroll = 0;
 			int8_t  col_off, pix_off;
 
@@ -503,52 +525,205 @@ void vdp_render_full_plane(/*int plane, */int priority) {
 				line = (line + (vdp.vsram[(plane ? 1 : 0)] & 0x3ff)) % (vdp.sc_height << 3);
 
 			row = (line / 8) * vdp.sc_width;
-			pixrow = line % 8;
+			//pixrow = line % 8;
 
 			for(int x=0;x<(vdp.dis_cells);x++) {
 				uint16_t name_ent = p[row + ((col_off + ((pix_off + (x*8)) >> 3)) % vdp.sc_width)];
 
-//				if ((name_ent >> 15) != priority) {
-//				skip[priority][plane][(y*40)+x] = 1;
-//				continue;
-//				}
 				if ((name_ent >> 15) == priority) {
-					pvr_poly_cxt_t cxt;
 					skip[priority][plane][(y*40)+x] = 0;
-					uint16_t *tex = tile_txr[priority][plane][(y*40)+x];
-					uint8_t *pixels = (vdp.vram + ((name_ent & 0x7ff) << 5));
-					int pal = (name_ent >> 9) & 0x30;
-
-					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(pal>>4),
-					8, 8, tile_txr[priority][plane][(y*40)+x], PVR_FILTER_NONE);
-					pvr_poly_compile(&tile_hdr[priority][plane][(y*40)+x], &cxt);
-					cxt.gen.alpha = 1;
-					cxt.blend.src = PVR_BLEND_DESTCOLOR;
-					cxt.blend.dst = PVR_BLEND_ZERO;
-
+					// we haven't already loaded this tile if necessary
+					if(!tn_used[name_ent & 0x7ff]) {
+						uint8_t *pixels = (vdp.vram + ((name_ent & 0x7ff) << 5));
+						tn_used[name_ent & 0x7ff] = 1;
+						uint32_t *data = (uint32_t *)pixels;
+						for(int di = 0; di < 8; di++) {
+							uint32_t d = data[di];
+							SWAP_WORDS(d);
+							data_copy[di] = d;
+						}
+						pixels = (uint8_t *)data_copy;
 #if TWIDDLEIT
 #define TWIDTAB(xx) ( (xx&1)|((xx&2)<<1)|((xx&4)<<2)|((xx&8)<<3)|((xx&16)<<4)| \
                      ((xx&32)<<5)|((xx&64)<<6)|((xx&128)<<7)|((xx&256)<<8)|((xx&512)<<9) )
 #define TWIDOUT(xx, yy) ( TWIDTAB((yy)) | (TWIDTAB((xx)) << 1) )
+						for(int i = 0; i < 8; i += 2) {
 
-					for(int i = 0; i < 8; i += 2) {
+							int yout = i;
 
-						int yout = i;
-
-						for(int j = 0; j < 8; j += 2) {
-							tex[TWIDOUT((j & 7) / 2, (yout & 7) / 2) + (j / 8 + yout / 8)*8 * 8 / 4] =
-							(pixels[(j + i * 8) >> 1] & 15) | ((pixels[(j + (i + 1) * 8) >> 1] & 15) << 4) |
-							((pixels[(j + i * 8) >> 1] >> 4) << 8) | ((pixels[(j + (i + 1) * 8) >> 1] >> 4) << 12);
+							for(int j = 0; j < 8; j += 2) {
+								tmptex[TWIDOUT((j & 7) / 2, (yout & 7) / 2) + (j / 8 + yout / 8)*8 * 8 / 4] =
+								(pixels[(j + i * 8) >> 1] & 15) | ((pixels[(j + (i + 1) * 8) >> 1] & 15) << 4) |
+								((pixels[(j + i * 8) >> 1] >> 4) << 8) | ((pixels[(j + (i + 1) * 8) >> 1] >> 4) << 12);
+							}
 						}
-					}
-#else					
-					pvr_txr_load(pixels, tex, 64);
-					//memcpy(tex,pixels,32);
+						pvr_txr_load(tmptex, tn_ptr[(name_ent & 0x7ff)], 32);
+#else
+						pvr_txr_load(pixels, tn_ptr[(name_ent & 0x7ff)], 32);
 #endif
+					}
+					// finished loading tile into texture here
+					skip[priority][plane][(y*40)+x] = 0;
+					//if((name_ent & 0x7ff) != last_tn[priority][plane][(y*40)+x]) {
+					pvr_poly_cxt_t cxt;
+					last_tn[priority][plane][(y*40)+x] = (name_ent & 0x7ff);
+					int pal = (name_ent >> 9) & 0x30;
+					int hft = ((name_ent >> 11) & 0x1);
+					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(pal>>4),
+					8, 8, tn_ptr[(name_ent & 0x7ff)], PVR_FILTER_NONE);
+					pvr_poly_compile(&tile_hdr[priority][plane][(y*40)+x], &cxt);
+					//cxt.gen.alpha = 1;
+					//cxt.txr.alpha = 1;
+					cxt.blend.src = PVR_BLEND_DESTCOLOR;
+					cxt.blend.dst = PVR_BLEND_ZERO;					
+					hf[priority][plane][(y*40)+x] = hft;
+				}
+				if(alltime_maxtn < (name_ent & 0x7ff)) {
+					alltime_maxtn = (name_ent & 0x7ff);
 				}
 			}
 		}
 	}
+}
+
+#define SWAP_WORDS(x) __asm__ volatile ("swap.w %0, %0" : "+r" (x))
+#define spr_start (vdp.vram + sn)
+
+void vdp_render_pvr_sprites(int priority) {
+//	uint8_t pixel;
+    uint8_t *pixels;
+    uint32_t spr_ent_bot,spr_ent_top;
+    uint32_t c=0, cells=64, i=0, j, /*k,*/ h,v, sp, sl, sh, sv, sn, sc, shf, svf;
+//    uint32_t dis_line=16;
+    uint32_t ppl=0;
+//    uint32_t dis_ppl=256;
+    uint32_t sol=0;  
+    int32_t sx, sy;
+    int32_t list_ordered[80];
+    uint64_t spr_ent;
+	memset(&sprite_used[priority][0],0,80);
+
+    for(j=0;j<80;++j)
+        list_ordered[j]=-1;
+
+    if (!(vdp.dis_cells == 32))
+        cells = 80;
+
+//    if(cells == 80)
+//    {
+//        dis_line=20;	
+//        dis_ppl=320;
+//    }
+
+    vdp.status &= 0x0040; // not too sure about this... 
+
+    for(i=0;i<cells;++i)
+    {
+		spr_ent = vdp.sat[c];
+
+        spr_ent_bot = (spr_ent >> 32);
+        SWAP_WORDS(spr_ent_bot);
+		spr_ent_top = (spr_ent & 0x00000000ffffffff);
+		SWAP_WORDS(spr_ent_top);
+        sy = ((spr_ent_top & 0x03FF0000) >> 16)-128;
+        sh = ((spr_ent_top & 0x00000C00) >> 10)+1;
+        sv = ((spr_ent_top & 0x00000300) >> 8)+1;
+
+//        if((line >= sy) && (line < (sy+(sv<<3)))) 
+        if (0 <= sy && (sy+(sv<<3)) <= 223)
+		{
+            sp = (spr_ent_bot & 0x80000000) >> 31;
+
+            if(sp == priority) 
+            {
+	        	list_ordered[i]=c;
+	    	}
+
+            sol++;
+            ppl+=(sh<<3);
+
+        /*    if(!(sol < dis_line))
+            {
+     	        vdp.status |= 0x0040;
+				goto end;
+            }			
+
+	    	if(!(ppl < dis_ppl))
+	    	{
+	        	goto end;
+            }
+		*/	
+        }
+
+        sl = (spr_ent_top & 0x0000007F);	
+        if(sl)
+            c = sl;
+        else
+end:
+            break;			
+    }
+
+    for(i=0;i<cells;i++)
+    {
+		int next_index = list_ordered[( 79 - ( (cells==64)?16:0 ) - i )];
+		if( next_index > -1 )
+		{
+			spr_ent = vdp.sat[next_index];
+
+            spr_ent_bot = (spr_ent >> 32);
+            SWAP_WORDS(spr_ent_bot);
+			spr_ent_top = (spr_ent & 0x00000000ffffffff);
+			SWAP_WORDS(spr_ent_top);
+            sy = ((spr_ent_top & 0x03FF0000) >> 16)-128;
+            sh = ((spr_ent_top & 0x00000C00) >> 10)+1;
+            sv = ((spr_ent_top & 0x00000300) >> 8)+1;
+            svf = (spr_ent_bot & 0x10000000) >> 28;
+            shf = (spr_ent_bot & 0x08000000) >> 27;
+            sn = (spr_ent_bot & 0x07FF0000) >> 11;
+            sx = (spr_ent_bot & 0x000003FF)-128;		
+            sc = (spr_ent_bot & 0x60000000) >> 29;
+
+            if (sx < -31 || sy < -31)
+                continue;
+
+			sprite_used[priority][next_index] = 1;
+
+            for(v = 0; v < sv; ++v) 
+            {
+                for(h = 0; h < sh; ++h) 
+                {
+                    pixels = (uint8_t *)(spr_start + (((sv*h)+v)<<5));
+					uint32_t *data = (uint32_t *)pixels;
+					for(int di = 0; di < 8; di++) {
+						uint32_t d = data[di];
+						SWAP_WORDS(d);
+						data_copy[di] = d;
+					}
+					pixels = (uint8_t*)data_copy;
+#if TWIDDLEIT
+					for(int ti = 0; ti < 8; ti += 2) {
+						int yout = ti;
+						for(int tj = 0; tj < 8; tj += 2) {
+							tmptex[TWIDOUT((tj & 7) / 2, (yout & 7) / 2) + (tj / 8 + yout / 8)*8 * 8 / 4] =
+							(pixels[(tj + ti * 8) >> 1] & 15) | ((pixels[(tj + (ti + 1) * 8) >> 1] & 15) << 4) |
+							((pixels[(tj + ti * 8) >> 1] >> 4) << 8) | ((pixels[(tj + (ti + 1) * 8) >> 1] >> 4) << 12);
+						}
+					}		
+					pvr_txr_load(tmptex, sprite_ptr[priority][next_index][(v*sh)+h], 32);
+#else
+					pvr_txr_load(pixels, sprite_ptr[priority][next_index][(v*4)+h], 32);
+#endif
+					pvr_poly_cxt_txr(&sprite_cxt[priority][next_index][(v*sh)+h], PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(sc),
+					8, 8, sprite_ptr[priority][next_index][(v*sh)+h], PVR_FILTER_NONE);
+					pvr_poly_compile(&sprite_hdr[priority][next_index][(v*sh)+h], &sprite_cxt[priority][next_index][(v*sh)+h]);
+					sprite_cxt[priority][next_index][(v*sh)+h].gen.alpha = 1;
+					sprite_cxt[priority][next_index][(v*sh)+h].txr.alpha = 1;
+					sprite_cxt[priority][next_index][(v*sh)+h].blend.src = PVR_BLEND_DESTCOLOR;
+					sprite_cxt[priority][next_index][(v*sh)+h].blend.dst = PVR_BLEND_ZERO;
+                } 
+            } 
+        }       
+    }
 }
 
 void vdp_render_plane(int line, int plane, int priority)
@@ -600,33 +775,7 @@ void vdp_render_plane(int line, int plane, int priority)
 			else
 				data = *(uint32_t *)(vdp.vram + ((name_ent & 0x7ff) << 5) + (pixrow * 4));
 			SWAP_WORDS(data);
-#if 0
-if(line == 108) {
-//	if (i == 4) 
-{
-//		sq_cpy(tile_txr, (vdp.vram + ((name_ent & 0x7ff) << 5)), 32);
-// twiddling a 4bpp 8*8 tile from sh4 to pvr mem
 
-/* Linear/iterative twiddling algorithm from Marcus' tatest */
-#define TWIDTAB(x) ( (x&1)|((x&2)<<1)|((x&4)<<2)|((x&8)<<3)|((x&16)<<4)| \
-                     ((x&32)<<5)|((x&64)<<6)|((x&128)<<7)|((x&256)<<8)|((x&512)<<9) )
-#define TWIDOUT(x, y) ( TWIDTAB((y)) | (TWIDTAB((x)) << 1) )
-
-const uint32_t min = 8;
-const uint32_t mask = 8 - 1;
-uint16_t *vtex = tile_txr;
-uint8_t *pixels = (vdp.vram + ((name_ent & 0x7ff) << 5));
-for(uint32_t y = 0; y < 8; y += 2) {
-		uint32_t yout = y;
-
-	for(uint32_t x = 0; x < 8; x += 2) {
-		vtex[TWIDOUT((x & mask) / 2, (yout & mask) / 2) + (x / min + yout / min)*min * min / 4] =
-		(pixels[(x + y * 8) >> 1] & 15) | ((pixels[(x + (y + 1) * 8) >> 1] & 15) << 4) |
-		((pixels[(x + y * 8) >> 1] >> 4) << 8) | ((pixels[(x + (y + 1) * 8) >> 1] >> 4) << 12);
-	}
-}	}
-}
-#endif
 			if ((name_ent >> 11) & 0x1) {
 				for (j = 0; j < 8; j++) {
 					pixel = data & 0x0f;
@@ -676,7 +825,6 @@ struct spr_ent_s {
     int16_t x;
 };
 
-#define SWAP_WORDS(x) __asm__ volatile ("swap.w %0, %0" : "+r" (x))
 
 void vdp_render_sprites2(int line, int priority)
 {
@@ -703,14 +851,7 @@ void vdp_render_sprites2(int line, int priority)
             spr_ent->pal = (spr_ent_raw[5] & 0x60) >> 1;
             spr_ent->prio = (spr_ent_raw[5] & 0x80) >> 7;
             spr_ent->x = (((spr_ent_raw[7] & 0x03) << 8) | spr_ent_raw[6]) - 128;
-            if (0) { //vdp_debug) {
-                //printf("%02x%02x%02x%02x%02x%02x%02x%02x ",
-                //       spr_ent_raw[1], spr_ent_raw[0], spr_ent_raw[3], spr_ent_raw[2],
-                //       spr_ent_raw[5], spr_ent_raw[4], spr_ent_raw[7], spr_ent_raw[6]);
-                printf("y=%d, v=%d, h=%d, l=%d, n=%d, hf=%d, vf=%d, pal=%d, prio=%d, x=%d\n",
-                      spr_ent->y, spr_ent->v, spr_ent->h, spr_ent->l, spr_ent->n,
-                      spr_ent->hf, spr_ent->vf, spr_ent->pal, spr_ent->prio, spr_ent->x);
-            }
+
             i = spr_ent->l;
             if (i == 0)
                 break;
@@ -777,6 +918,9 @@ void vdp_render_sprites2(int line, int priority)
         uint16_t spr_pat_voff = spr_pat_vskip * 32 + spr_pat_line * 4;
 
         uint8_t *pixels = vdp.vram + spr_ent->n + spr_pat_voff;
+		if (alltime_maxtn < ((spr_ent->n + spr_pat_voff)>>5)) {
+				alltime_maxtn = ((spr_ent->n + spr_pat_voff)>>5);
+		}
         uint8_t pal = spr_ent->pal;
         uint8_t pat_stride_idx = spr_ent->v - 1;
 
@@ -804,7 +948,6 @@ void vdp_render_sprites2(int line, int priority)
     }
 }
 
-#define spr_start (vdp.vram + sn)
 
 void vdp_render_sprites1(int line, int priority)
 {
@@ -955,16 +1098,12 @@ end:
 void vdp_render_scanline(int line)
 {
 	int i;
-//	uint32_t fill = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
+	uint32_t fill = vdp.dc_cram[vdp.regs[7] & 0x3f] << 16 | vdp.dc_cram[vdp.regs[7] & 0x3f];
 	/* Prefill the scanline with the backdrop color. */
-//	for (i = 0; i < (vdp.sc_width * 8); i++)
-//		((uint32_t*)ocr_vram)[i] = fill;
-
-	memcpy((void*)ocr_vram, fill, 640);
-	//memcpy( ((void*)ocr_vram) + 1024, fill, 640);
+	for (i = 0; i < (vdp.sc_width * 8); i++)
+		((uint32_t*)ocr_vram)[i] = fill;
 
 	if (vdp.regs[1] & 0x40) {
-//		vdp_render_full_plane(0);
 		vdp_render_plane(line, 1, 0);
 		vdp_render_plane(line, 0, 0);
 		vdp_render_sprites2(line, 0);
@@ -974,23 +1113,4 @@ void vdp_render_scanline(int line)
 	}
 
 	sq_cpy((((uint16_t *)display_txr) + ((line/*>>2*/) * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 )); //2048);////(vdp.dis_cells * 8  * 2 )*2);
-//	sq_cpy((((uint16_t *)display_txr) + ((line+1) * 512)), ((void*)ocr_vram)+1024, (vdp.dis_cells * 8  * 2 )*2);
-
-#if 0
-	if (vdp.regs[1] & 0x40) {
-		vdp_render_plane(line+2, 1, 0);
-		vdp_render_plane(line+2, 0, 0);
-		vdp_render_sprites(line+2, 0);
-		vdp_render_plane(line+2, 1, 1);
-		vdp_render_plane(line+2, 0, 1);
-		vdp_render_sprites(line+2, 1);
-	}
-
-	sq_cpy((((uint16_t *)display_txr) + ((line+2) * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 ));
-#endif
-//	sq_cpy((((uint16_t *)display_txr) + ((line+1) * 512)), ocr_vram, (vdp.dis_cells * 8  * 2 ));
-	//memcpy((((uint16_t *)display_txr) + (line * 512)), ocr_vram, (vdp.dis_cells * 8 * 2));
-/*for(int x=0;x<(vdp.sc_width * 8);x++) {
-	vram_s[line * 640 + x] = ocr_vram[x];
-}*/
 }

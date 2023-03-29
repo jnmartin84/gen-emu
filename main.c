@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 {
 	int ch, fd;
 
-    dbgio_dev_select("fb");
+//    dbgio_dev_select("fb");
 	gen_init();
 	
 	void *test = malloc(64);
@@ -100,6 +100,7 @@ while(1) {
 }
 //uint32_t field_count = 0;
 char str[256];
+extern uint32_t alltime_maxtn;
 extern uint8_t skip[2][2][40*28];
 void run_one_field(void)
 {
@@ -137,10 +138,10 @@ for(line=0;line<224;line+=4) {
 	vdp_render_cram();
 #endif
 memset(skip,1,4*40*28);
-		vdp_render_full_plane(0);
-//		vdp_render_full_plane(0,0);
-		vdp_render_full_plane(1);
-//		vdp_render_full_plane(0,1);
+		vdp_render_pvr_plane(0);
+		vdp_render_pvr_sprites(0);
+		vdp_render_pvr_plane(1);
+		vdp_render_pvr_sprites(1);
 
 	/* Submit whole screen to pvr. */
 	do_frame();
@@ -158,4 +159,7 @@ end_time = rtc_unix_secs();
 	double emulated_MHz = (total_cycles / 1048576.0) / (end_time - start_time);
 sprintf(str, "emulated mhz: %f", emulated_MHz);
 minifont_draw_str(vram_s + 640*20 + 20, 640, str);
+		sprintf(str, "new all-time max tilenum %08x (%d)\n", alltime_maxtn, alltime_maxtn);
+		minifont_draw_str(vram_s + 640*40 + 20, 640, str);
+
 }

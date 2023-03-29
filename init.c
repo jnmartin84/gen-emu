@@ -11,7 +11,7 @@
 
 pvr_init_params_t pvr_params = {
 	{ PVR_BINSIZE_16, PVR_BINSIZE_0, PVR_BINSIZE_16,
-	  PVR_BINSIZE_0, PVR_BINSIZE_0 }, 256 * 1024
+	  PVR_BINSIZE_0, PVR_BINSIZE_0 }, 512 * 1024
 };
 
 //extern SN76489 PSG; 
