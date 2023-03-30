@@ -125,15 +125,15 @@ void do_frame()
 				for(int v=0;v<sv;v++) {
 					if(svf) {
 						if(shf) {
-							pvr_prim(&sprite_hdr[tpr][si][((sv-v)*sh)+(sh-h)], sizeof(pvr_poly_hdr_t));
+							pvr_prim(&sprite_hdr[tpr][si][((sv-v-1)*sh)+(sh-h-1)], sizeof(pvr_poly_hdr_t));
 						}
 						else {
-							pvr_prim(&sprite_hdr[tpr][si][((sv-v)*sh)+h], sizeof(pvr_poly_hdr_t));
+							pvr_prim(&sprite_hdr[tpr][si][((sv-v-1)*sh)+h], sizeof(pvr_poly_hdr_t));
 						}
 					}
 					else {
 						if(shf) {
-							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+(sh-h)], sizeof(pvr_poly_hdr_t));
+							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+(sh-h-1)], sizeof(pvr_poly_hdr_t));
 						}
 						else {
 							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+h], sizeof(pvr_poly_hdr_t));

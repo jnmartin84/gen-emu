@@ -26,7 +26,7 @@ pvr_ptr_t cram_txr;
 
 // priority plane tile
 pvr_poly_hdr_t tile_hdr[2][2][40*28];
-pvr_ptr_t tile_txr[2][2][40*28];
+//pvr_ptr_t tile_txr[2][2][40*28];
 uint8_t skip[2][2][40*28];
 uint8_t hf[2][2][40*28];
 uint8_t last_tn[2][2][40*28];
@@ -62,6 +62,7 @@ void vdp_init(void)
 #endif
 pvr_set_pal_format(PVR_PAL_ARGB1555);
 memset(last_tn,-1,4*40*28);
+#if 0
 for(int pr=0;pr<2;pr++) {
 
 for(int p=0;p<2;p++) {
@@ -73,6 +74,8 @@ for(int h=0;h<224/8;h++) {
 }
 }
 }
+#endif
+
 for(int i=0;i<4096;i++) {
 		tn_ptr[i] = pvr_mem_malloc(32);
 }
