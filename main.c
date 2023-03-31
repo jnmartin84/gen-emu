@@ -90,7 +90,6 @@ paused:
 
 char str[256];
 extern uint8_t tn_used[4096];
-extern uint8_t skip[2][2][40*28];
 extern int planes_size;
 void run_one_field(void)
 {
@@ -105,14 +104,13 @@ void run_one_field(void)
 	}
 
 
-	if (!field_skip) {
-		//memset(skip,1,4*40*28);
+	//if (!field_skip) 
+	{
 		vdp_setup_pvr_planes();
-
 		vdp_setup_pvr_sprites();
-		vdp_render_pvr_planes(0);
+
+		vdp_render_pvr_planes();
 		vdp_render_pvr_sprites(0);
-		vdp_render_pvr_planes(1);
 		vdp_render_pvr_sprites(1);
 
 		/* Submit whole screen to pvr. */
