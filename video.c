@@ -26,13 +26,16 @@ extern uint8_t display_ptr;
 pvr_vertex_t vert;//[2][2][40*28][4];
 
 extern pvr_poly_hdr_t tile_hdr[2][2][40*28];
-extern pvr_ptr_t tile_txr[2][2][40*28];
-extern uint8_t skip[2][2][40*28];
-extern uint8_t hf[2][2][40*28];
+//extern pvr_ptr_t tile_txr[2][2][40*28];
+//extern uint8_t skip[2][2][40*28];
+//extern uint8_t hf[2][2][40*28];
+//extern uint8_t vf[2][2][40*28];
 extern uint8_t sprite_used[2][80];
 extern pvr_poly_hdr_t sprite_hdr[2][80][16];
 extern uint8_t sprnum[2][80];
-
+extern struct plane_pvr_tile *planes_head;
+extern int planes_size;
+extern struct plane_pvr_tile planes_pool[2240];
 void do_frame()
 {
 	pvr_vertex_t vert;
@@ -46,6 +49,7 @@ void do_frame()
 	pvr_scene_begin(); 
 	pvr_list_begin(PVR_LIST_TR_POLY);
 
+#if 0
 	for(int tpr=0;tpr<2;tpr++) {
 		//if (0)
 		for(int tp=1;tp>-1;tp--) {
@@ -55,13 +59,7 @@ void do_frame()
 						pvr_prim(&tile_hdr[tpr][tp][(ty*40)+tx], sizeof(pvr_poly_hdr_t));
 
 						vert.flags = PVR_CMD_VERTEX;
-						vert.x = (tx*16);
-						vert.y = (ty*16)+16;
-						vert.u = 1.0f;
-						if(hf[tpr][tp][(ty*40)+tx]) {
-							vert.u = 0.0f;
-						}
-						vert.v = 1.0f;
+
 						if(tpr == 0) {
 							if(tp == 1) {
 								vert.z = 1.0f;
@@ -78,30 +76,153 @@ void do_frame()
 								vert.z = 3.0f;
 							}
 						}
+						
+						vert.x = (tx*16);
+						vert.y = (ty*16)+16;
+
+						if(!hf[tpr][tp][(ty*40)+tx]) {
+							vert.u = 1.0f;
+						}
+						else {
+							vert.u = 0.0f;
+						}
+						
+						if(!vf[tpr][tp][(ty*40)+tx]) {
+							vert.v = 1.0f;
+						}
+						else {
+							vert.v = 0.0;
+						}
+
+
 
 						pvr_prim(&vert, sizeof(vert));
 						vert.y = (ty*16);
-						vert.v = 0.0f;
+						if(!vf[tpr][tp][(ty*40)+tx]) {
+							vert.v = 0.0f;
+						}
+						else {
+							vert.v = 1.0;
+						}
 						pvr_prim(&vert, sizeof(vert));
 
 						vert.x = (tx*16) + 16;
 						vert.y = (ty*16) + 16;
-						vert.u = 0.0f;
-						if(hf[tpr][tp][(ty*40)+tx]) {
+						if(!hf[tpr][tp][(ty*40)+tx]) {
+							vert.u = 0.0f;
+						}
+						else {
 							vert.u = 1.0f;
 						}
-						vert.v = 1.0f;
+						if(!vf[tpr][tp][(ty*40)+tx]) {
+							vert.v = 1.0f;
+						}
+						else {
+							vert.v = 0.0;
+						}
 						pvr_prim(&vert, sizeof(vert));
 
 						vert.flags = PVR_CMD_VERTEX_EOL;
 						vert.y = (ty*16);
-						vert.v = 0.0f;
+						if(!vf[tpr][tp][(ty*40)+tx]) {
+							vert.v = 0.0f;
+						}
+						else {
+							vert.v = 1.0;
+						}
 						pvr_prim(&vert, sizeof(vert));
 					}
 				}
 			}
 		}
+#endif
 #if 1
+	struct plane_pvr_tile *p;
+	//while(p != NULL){
+	for (int pi=0;pi<planes_size;pi++) {
+		p = &planes_pool[pi];//planes_head;//assign head to p 
+		int tx = p->x;
+		int ty = p->y;
+		
+		pvr_prim(p->hdr, sizeof(pvr_poly_hdr_t));
+		vert.flags = PVR_CMD_VERTEX;
+
+		if(p->priority == 0) {
+			if(p->plane == 1) {
+				vert.z = 1.0f;
+			}
+			else {
+				vert.z = 1.5f;
+			}
+		}
+		else {
+			if(p->plane == 1) {
+				vert.z = 3.0f;
+			}
+			else {
+				vert.z = 3.5f;
+			}
+		}
+						
+		vert.x = (tx*16);
+		vert.y = (ty*16)+16;
+
+		if(!p->hf) {
+			vert.u = 1.0f;
+		}
+		else {
+			vert.u = 0.0f;
+		}
+						
+		if(!p->vf) {
+			vert.v = 1.0f;
+		}
+		else {
+			vert.v = 0.0;
+		}
+
+		pvr_prim(&vert, sizeof(vert));
+		vert.y = (ty*16);
+		if(!p->vf) {
+			vert.v = 0.0f;
+		}
+		else {
+			vert.v = 1.0;
+		}
+		pvr_prim(&vert, sizeof(vert));
+
+		vert.x = (tx*16) + 16;
+		vert.y = (ty*16) + 16;
+		if(!p->hf) {
+			vert.u = 0.0f;
+		}
+		else {
+			vert.u = 1.0f;
+		}
+		if(!p->vf) {
+			vert.v = 1.0f;
+		}
+		else {
+			vert.v = 0.0;
+		}
+		pvr_prim(&vert, sizeof(vert));
+
+		vert.flags = PVR_CMD_VERTEX_EOL;
+		vert.y = (ty*16);
+		if(!p->vf) {
+			vert.v = 0.0f;
+		}
+		else {
+			vert.v = 1.0;
+		}
+		pvr_prim(&vert, sizeof(vert));
+						
+		//p = p->next;//traverse the list until p is the last node.The last node always points to NULL.
+	}
+#endif
+		
+#if 1
+	for(int tpr=0;tpr<2;tpr++) {
 		// now do sprites
 		for (int si = 0; si < 80; si++) {
 			if (sprite_used[tpr][si]) {
@@ -140,6 +261,14 @@ void do_frame()
 						}
 					}
 					vert.flags = PVR_CMD_VERTEX;
+					if(tpr == 0) {
+						vert.z = 2.0f + (0.01*(80-si));
+					}
+					if(tpr == 1) {
+						vert.z = 4.0f + (0.01*(80-si));
+					}
+
+
 					vert.x = (sx*2) + (h*16);
 					vert.y = (sy*2) + (v*16) + (16);
 					vert.u = 1.0f;
@@ -149,12 +278,6 @@ void do_frame()
 					vert.v = 1.0f;
 					if(svf) {
 						vert.v = 0.0f;
-					}
-					if(tpr == 0) {
-						vert.z = 2.0f;
-					}
-					if(tpr == 1) {
-						vert.z = 4.0f;
 					}
 					
 					pvr_prim(&vert, sizeof(vert));

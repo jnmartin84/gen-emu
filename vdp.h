@@ -52,4 +52,17 @@ void vdp_init(void);
 void vdp_render_cram(void);
 void vdp_render_scanline(int);
 
+struct plane_pvr_tile {
+	pvr_poly_hdr_t *hdr;
+	int x;
+	int y;
+	int hf;
+	int vf;
+	int plane;
+	int priority;
+
+	struct plane_pvr_tile *next;
+};
+
+
 #endif // __gen_vdp_h
