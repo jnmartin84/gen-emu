@@ -3,43 +3,19 @@
 #include "gen-emu.h"
 #include "vdp.h"
 
-extern struct vdp_s vdp;
-struct spr_ent_s {
-    int16_t y;
-    uint8_t v;
-    uint8_t h;
-    uint8_t l;
-    uint16_t n;
-    uint8_t hf;
-    uint8_t vf;
-    uint8_t pal;
-    uint8_t prio;
-    int16_t x;
-};
 /* PVR data from vdp.c */
-extern pvr_poly_hdr_t disp_hdr[2];
-extern pvr_ptr_t disp_txr[2];
-extern pvr_ptr_t display_txr;
-extern pvr_poly_hdr_t cram_hdr;
-extern pvr_ptr_t cram_txr;
-extern uint8_t display_ptr;
-pvr_vertex_t vert;//[2][2][40*28][4];
 
-extern pvr_poly_hdr_t tile_hdr[2][2][40*28];
-//extern pvr_ptr_t tile_txr[2][2][40*28];
-//extern uint8_t skip[2][2][40*28];
-//extern uint8_t hf[2][2][40*28];
-//extern uint8_t vf[2][2][40*28];
-extern uint8_t sprite_used[2][80];
-extern pvr_poly_hdr_t sprite_hdr[2][80][16];
-extern uint8_t sprnum[2][80];
+pvr_vertex_t vert;
+
 extern struct plane_pvr_tile *planes_head;
 extern int planes_size;
 extern struct plane_pvr_tile planes_pool[2240];
+extern int sprites_size;
+extern struct vdp_pvr_sprite sprites_pool[80];
+
 void do_frame()
 {
 	pvr_vertex_t vert;
-//	int x, y, w, h;
 
 	vert.argb = 0xffffffff;
 	vert.oargb = 0x00000000;
@@ -49,98 +25,10 @@ void do_frame()
 	pvr_scene_begin(); 
 	pvr_list_begin(PVR_LIST_TR_POLY);
 
-#if 0
-	for(int tpr=0;tpr<2;tpr++) {
-		//if (0)
-		for(int tp=1;tp>-1;tp--) {
-			for(int ty=0;ty<224/8;ty++) {
-				for(int tx=0;tx<40;tx++) {
-					if(!skip[tpr][tp][(ty*40)+tx]) {
-						pvr_prim(&tile_hdr[tpr][tp][(ty*40)+tx], sizeof(pvr_poly_hdr_t));
-
-						vert.flags = PVR_CMD_VERTEX;
-
-						if(tpr == 0) {
-							if(tp == 1) {
-								vert.z = 1.0f;
-							}
-							if(tp == 0) {
-								vert.z = 1.0f;
-							}
-						}
-						if(tpr == 1) {
-							if(tp == 1) {
-								vert.z = 3.0f;
-							}
-							if(tp == 0) {
-								vert.z = 3.0f;
-							}
-						}
-						
-						vert.x = (tx*16);
-						vert.y = (ty*16)+16;
-
-						if(!hf[tpr][tp][(ty*40)+tx]) {
-							vert.u = 1.0f;
-						}
-						else {
-							vert.u = 0.0f;
-						}
-						
-						if(!vf[tpr][tp][(ty*40)+tx]) {
-							vert.v = 1.0f;
-						}
-						else {
-							vert.v = 0.0;
-						}
-
-
-
-						pvr_prim(&vert, sizeof(vert));
-						vert.y = (ty*16);
-						if(!vf[tpr][tp][(ty*40)+tx]) {
-							vert.v = 0.0f;
-						}
-						else {
-							vert.v = 1.0;
-						}
-						pvr_prim(&vert, sizeof(vert));
-
-						vert.x = (tx*16) + 16;
-						vert.y = (ty*16) + 16;
-						if(!hf[tpr][tp][(ty*40)+tx]) {
-							vert.u = 0.0f;
-						}
-						else {
-							vert.u = 1.0f;
-						}
-						if(!vf[tpr][tp][(ty*40)+tx]) {
-							vert.v = 1.0f;
-						}
-						else {
-							vert.v = 0.0;
-						}
-						pvr_prim(&vert, sizeof(vert));
-
-						vert.flags = PVR_CMD_VERTEX_EOL;
-						vert.y = (ty*16);
-						if(!vf[tpr][tp][(ty*40)+tx]) {
-							vert.v = 0.0f;
-						}
-						else {
-							vert.v = 1.0;
-						}
-						pvr_prim(&vert, sizeof(vert));
-					}
-				}
-			}
-		}
-#endif
-#if 1
+	// iterate over used planes
 	struct plane_pvr_tile *p;
-	//while(p != NULL){
 	for (int pi=0;pi<planes_size;pi++) {
-		p = &planes_pool[pi];//planes_head;//assign head to p 
+		p = &planes_pool[pi];
 		int tx = p->x;
 		int ty = p->y;
 		
@@ -216,102 +104,85 @@ void do_frame()
 			vert.v = 1.0;
 		}
 		pvr_prim(&vert, sizeof(vert));
-						
-		//p = p->next;//traverse the list until p is the last node.The last node always points to NULL.
 	}
-#endif
-		
-#if 1
-	for(int tpr=0;tpr<2;tpr++) {
-		// now do sprites
-		for (int si = 0; si < 80; si++) {
-			if (sprite_used[tpr][si]) {
-				uint32_t spr_ent_bot,spr_ent_top;
-				uint32_t sh, sv, shf, svf;
-				int32_t sx, sy;
-				uint64_t spr_ent;
-	#define SWAP_WORDS(x) __asm__ volatile ("swap.w %0, %0" : "+r" (x))
-				spr_ent = vdp.sat[si];
-				spr_ent_bot = (spr_ent >> 32);
-				SWAP_WORDS(spr_ent_bot);
-				spr_ent_top = (spr_ent & 0x00000000ffffffff);
-				SWAP_WORDS(spr_ent_top);
-				sy = ((spr_ent_top & 0x03FF0000) >> 16)-128;
-				sh = ((spr_ent_top & 0x00000C00) >> 10)+1;
-				sv = ((spr_ent_top & 0x00000300) >> 8)+1;
-				svf = (spr_ent_bot & 0x10000000) >> 28;
-				shf = (spr_ent_bot & 0x08000000) >> 27;
-				sx = (spr_ent_bot & 0x000003FF)-128;		
-				for(int h=0;h<sh;h++) {
-				for(int v=0;v<sv;v++) {
-					if(svf) {
-						if(shf) {
-							pvr_prim(&sprite_hdr[tpr][si][((sv-v-1)*sh)+(sh-h-1)], sizeof(pvr_poly_hdr_t));
-						}
-						else {
-							pvr_prim(&sprite_hdr[tpr][si][((sv-v-1)*sh)+h], sizeof(pvr_poly_hdr_t));
-						}
+
+	// iterate over used sprites
+	for(int si=0;si<sprites_size;si++) {
+		struct vdp_pvr_sprite *s = &sprites_pool[si];
+		int sx = s->x;
+		int sy = s->y;
+		int sh = s->h;
+		int sv = s->v;
+		int shf = s->hf;
+		int svf = s->vf;
+		int tpr = s->priority;
+
+		for(int v=0;v<sv;v++) {
+			for(int h=0;h<sh;h++) {
+				if(svf) {
+					if(shf) {
+						pvr_prim(s->hdr[((sv-v-1)*sh)+(sh-h-1)], sizeof(pvr_poly_hdr_t));
 					}
 					else {
-						if(shf) {
-							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+(sh-h-1)], sizeof(pvr_poly_hdr_t));
-						}
-						else {
-							pvr_prim(&sprite_hdr[tpr][si][(v*sh)+h], sizeof(pvr_poly_hdr_t));
-						}
-					}
-					vert.flags = PVR_CMD_VERTEX;
-					if(tpr == 0) {
-						vert.z = 2.0f + (0.01*(80-si));
-					}
-					if(tpr == 1) {
-						vert.z = 4.0f + (0.01*(80-si));
-					}
-
-
-					vert.x = (sx*2) + (h*16);
-					vert.y = (sy*2) + (v*16) + (16);
-					vert.u = 1.0f;
-					if(shf) {
-						vert.u = 0.0f;
-					}
-					vert.v = 1.0f;
-					if(svf) {
-						vert.v = 0.0f;
-					}
-					
-					pvr_prim(&vert, sizeof(vert));
-					vert.y = (sy*2) + (v*16);
-					vert.v = 0.0f;
-					if(svf) {
-						vert.v = 1.0f;
-					}
-					pvr_prim(&vert, sizeof(vert));
-
-					vert.x = (sx*2) + (h*16) + (16);
-					vert.y = (sy*2) + (v*16) + (16);
-					vert.u = 0.0f;
-					if(shf) {
-						vert.u = 1.0f;
-					}
-					vert.v = 1.0f;
-					if(svf) {
-						vert.v = 0.0f;
-					}
-					pvr_prim(&vert, sizeof(vert));
-
-					vert.flags = PVR_CMD_VERTEX_EOL;
-					vert.y = (sy*2) + (v*16);
-					vert.v = 0.0f;
-					if(svf) {
-						vert.v = 1.0f;
-					}
-					pvr_prim(&vert, sizeof(vert));
+						pvr_prim(s->hdr[((sv-v-1)*sh)+h], sizeof(pvr_poly_hdr_t));
 					}
 				}
+				else {
+					if(shf) {
+						pvr_prim(s->hdr[(v*sh)+(sh-h-1)], sizeof(pvr_poly_hdr_t));
+					}
+					else {
+						pvr_prim(s->hdr[(v*sh)+h], sizeof(pvr_poly_hdr_t));
+					}
+				}
+				vert.flags = PVR_CMD_VERTEX;
+				if(tpr == 0) {
+					vert.z = 2.0f + (0.01*si);
+				}
+				if(tpr == 1) {
+					vert.z = 4.0f + (0.01*si);
+				}
+
+				vert.x = (sx*2) + (h*16);
+				vert.y = (sy*2) + (v*16) + (16);
+				vert.u = 1.0f;
+				if(shf) {
+					vert.u = 0.0f;
+				}
+				vert.v = 1.0f;
+				if(svf) {
+					vert.v = 0.0f;
+				}
+						
+				pvr_prim(&vert, sizeof(vert));
+				vert.y = (sy*2) + (v*16);
+				vert.v = 0.0f;
+				if(svf) {
+					vert.v = 1.0f;
+				}
+				pvr_prim(&vert, sizeof(vert));
+
+				vert.x = (sx*2) + (h*16) + (16);
+				vert.y = (sy*2) + (v*16) + (16);
+				vert.u = 0.0f;
+				if(shf) {
+					vert.u = 1.0f;
+				}
+				vert.v = 1.0f;
+				if(svf) {
+					vert.v = 0.0f;
+				}
+				pvr_prim(&vert, sizeof(vert));
+
+				vert.flags = PVR_CMD_VERTEX_EOL;
+				vert.y = (sy*2) + (v*16);
+				vert.v = 0.0f;
+				if(svf) {
+					vert.v = 1.0f;
+				}
+				pvr_prim(&vert, sizeof(vert));
 			}
-		}
-#endif
+		}		
 	}
 
 	pvr_list_finish();

@@ -41,8 +41,9 @@ int main(int argc, char *argv[])
 	gen_init();
 	
 	rom_load(romname);
-planes_head = NULL;
+
 	gen_reset();
+
 	start_time = rtc_unix_secs();
 	do {
 		run_one_field();
@@ -90,7 +91,7 @@ paused:
 char str[256];
 extern uint8_t tn_used[4096];
 extern uint8_t skip[2][2][40*28];
-extern int max_planes_size;
+extern int planes_size;
 void run_one_field(void)
 {
 	int line;
@@ -123,8 +124,6 @@ void run_one_field(void)
 
 	/* input processing */
 	field_count++;
-	//if ((cnt % 60) == 0)
-	//	printf("%d\n",cnt);
 	end_time = rtc_unix_secs();
 
 #if 1
@@ -132,7 +131,8 @@ void run_one_field(void)
 	double emulated_MHz = (total_cycles / 1048576.0) / (end_time - start_time);
 	sprintf(str, "emulated mhz: %f", emulated_MHz);
 	minifont_draw_str(vram_s + 640*20 + 20, 640, str);
-//	sprintf(str, "max plane tiles %d\n", max_planes_size);
-//	minifont_draw_str(vram_s + 640*40 + 20, 640, str);
+	
+	//sprintf(str, "plane tiles %d\n", planes_size);
+	//minifont_draw_str(vram_s + 640*40 + 20, 640, str);
 #endif
 }
