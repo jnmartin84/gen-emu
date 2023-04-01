@@ -128,7 +128,7 @@ uint32_t rom_load(char *name)
 	/* Add ROM to cart. */
 	cart.rom = rom;
 	cart.rom_len = len;
-#if 0
+#if 1
 	/* Check if this cart has save ram. */
 	if (rom[0x1b0] == 'R' && rom[0x1b1] == 'A') {
 		uint32_t sr_start, sr_end, sr_len;
@@ -194,7 +194,7 @@ uint32_t rom_load(char *name)
 
 	printf("Cart details...\n");
 	printf("ROM Length: 0x%x (%d) bytes\n", cart.rom_len, cart.rom_len);
-#if 0	
+#if 1
 	if (cart.sram_len)
 		printf("RAM Length: 0x%x (%d) bytes%s\n", cart.sram_len, cart.sram_len,
 			   (cart.sram_banked ? ", banked" : ""));

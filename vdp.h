@@ -60,7 +60,7 @@ struct plane_pvr_tile {
 	int vf;
 	int plane;
 	int priority;
-//	int unused;
+	int unused;
 };
 
 struct vdp_pvr_sprite {
@@ -82,7 +82,7 @@ struct vdp_pvr_sprite {
 	int priority;
 	// 92 - 128
 	// 9 doesn't work but 17 does 
-	//	int unused[17];
+		int unused[17];
 };
 
 #endif // __gen_vdp_h

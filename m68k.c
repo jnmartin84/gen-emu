@@ -269,7 +269,7 @@ static uint32_t m68k_read_cart_16(uint32_t addr) {
 		uint32_t ret;// = 0xffff;
 //	addr &= 0xffffff;
 
-#if 0
+#if 1
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -285,7 +285,7 @@ static uint32_t m68k_read_cart_16(uint32_t addr) {
 		} else {
 #endif
 			ret = ((uint16_t *)cart.rom)[addr >> 1];
-#if 0
+#if 1
 		}
 #endif
 		SWAPBYTES16(ret);
@@ -448,7 +448,7 @@ static uint32_t m68k_read_cart_8(uint32_t addr) {
 	uint32_t ret;// = 0xff;
 	//addr &= 0xffffff;
 
-#if 0
+#if 1
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -464,7 +464,7 @@ static uint32_t m68k_read_cart_8(uint32_t addr) {
 		} else {
 #endif
 			ret = cart.rom[addr];
-#if 0
+#if 1
 		}
 #endif	
 	return ret;
@@ -481,7 +481,7 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 	addr &= 0xffffff;
 
 	if (addr < 0x400000) {
-#if 0
+#if 1
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -497,7 +497,7 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 		} else {
 #endif
 			ret = cart.rom[addr];
-#if 0
+#if 1
 		}
 #endif
 	} else 

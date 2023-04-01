@@ -11,7 +11,7 @@ KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS);// | INIT_OCRAM);
 #define FIELD_SKIP 2
 
 
-char *romname = "/cd/s1built.bin";
+char *romname = "/cd/sonic2.bin";
 
 char *scrcapname = "/pc/home/jkf/src/dc/gen-emu/screen.ppm";
 
@@ -103,15 +103,16 @@ void run_one_field(void)
 		//	z80_execute(228);
 	}
 
+//	if(field_count % 5 == 0) {
+//			memset(tn_used,0,2048);
+//	}
 
 	//if (!field_skip) 
 	{
 		vdp_setup_pvr_planes();
-		vdp_setup_pvr_sprites();
 
 		vdp_render_pvr_planes();
-		vdp_render_pvr_sprites(0);
-		vdp_render_pvr_sprites(1);
+		vdp_render_pvr_sprites();
 
 		/* Submit whole screen to pvr. */
 		do_frame();
