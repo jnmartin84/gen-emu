@@ -55,9 +55,9 @@ void vdp_init(void)
 #if 0
 	int filters;
 #if 0
-	filters = vid_check_cable() ? PVR_FILTER_BILINEAR : PVR_FILTER_BILINEAR;
+	filters = vid_check_cable() ? PVR_FILTER_NONE : PVR_FILTER_NONE;
 #else
-	filters = PVR_FILTER_BILINEAR;
+	filters = PVR_FILTER_NONE;
 #endif
 #endif
 
@@ -575,7 +575,7 @@ void vdp_render_pvr_planes(void) {
 
 		p = plane ? vdp.bgb : vdp.bga;
 
-		for(int y=0;y<28;y+=2) {
+		for(int y=0;y<28;y++) {
 			int line = y*8;
 			int row;//, pixrow;
 			int16_t hscroll = 0;
@@ -646,7 +646,7 @@ void vdp_render_pvr_planes(void) {
 #endif
 					// finished loading tile into texture here
 					//if((name_ent & 0x7ff) != last_tn[priority][plane][(y*40)+x]) 
-					{
+					//{
 					pvr_poly_cxt_t cxt;
 					//last_tn[priority][plane][(y*40)+x] = (name_ent & 0x7ff);
 					int pal = (name_ent >> 13) & 0x3;
@@ -655,7 +655,7 @@ void vdp_render_pvr_planes(void) {
 
 					struct plane_pvr_tile *tmp = &planes_pool[planes_size];//(struct plane_pvr_tile *)malloc(sizeof(struct plane_pvr_tile));
 
-					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(pal), 8, 8, tn_ptr[tn], PVR_FILTER_BILINEAR);
+					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(pal), 8, 8, tn_ptr[tn], PVR_FILTER_NONE);
 					pvr_poly_compile(&tile_hdr[priority][plane][(y*40)+x], &cxt);
 					cxt.blend.src = PVR_BLEND_DESTCOLOR;
 					cxt.blend.dst = PVR_BLEND_ZERO;					
@@ -669,7 +669,7 @@ void vdp_render_pvr_planes(void) {
 					tmp->plane = plane;
 
 					planes_size++;
-					}
+					//}
 				//}
 			}
 		}
@@ -707,18 +707,16 @@ void vdp_render_pvr_sprites(void) {
 
         if (0 <= sy && (sy+(sv<<3)) <= 223)
 		{
-            sy = ((spr_ent_top & 0x03FF0000) >> 16)-128;
+            sx = (spr_ent_bot & 0x000003FF)-128;		
+            if (sx < -31 || sy < -31)
+                goto next_sprite;
+
             sh = ((spr_ent_top & 0x00000C00) >> 10)+1;
-            sv = ((spr_ent_top & 0x00000300) >> 8)+1;
             sp = (spr_ent_bot & 0x80000000) >> 31;
             svf = (spr_ent_bot & 0x10000000) >> 28;
             shf = (spr_ent_bot & 0x08000000) >> 27;
             sn = (spr_ent_bot & 0x07FF0000) >> 11;
-            sx = (spr_ent_bot & 0x000003FF)-128;		
             sc = (spr_ent_bot & 0x60000000) >> 29;
-
-            if (sx < -31 || sy < -31)
-                goto next_sprite;
 
 			struct vdp_pvr_sprite *tmp = &sprites_pool[sprites_size];
 			sprites_size++;
@@ -765,14 +763,12 @@ void vdp_render_pvr_sprites(void) {
 					tmp->hdr[(v*sh)+h] = &sprite_hdr[sp][c][(v*sh)+h];
 
 					pvr_poly_cxt_t cxt;
-					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(sc), 8, 8, tn_ptr[sprite_tn], PVR_FILTER_BILINEAR);
+					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(sc), 8, 8, tn_ptr[sprite_tn], PVR_FILTER_NONE);
 					pvr_poly_compile(&sprite_hdr[sp][c][(v*sh)+h], &cxt);
 					cxt.blend.src = PVR_BLEND_DESTCOLOR;
 					cxt.blend.dst = PVR_BLEND_ZERO;
                } 
             }
-//            sp = (spr_ent_bot & 0x80000000) >> 31;
-        	//list_ordered[i] = c;
         }
 next_sprite:
         sl = (spr_ent_top & 0x0000007F);	
@@ -851,7 +847,7 @@ next_sprite:
 					tmp->hdr[(v*sh)+h] = &sprite_hdr[sp][next_index][(v*sh)+h];
 
 					pvr_poly_cxt_t cxt;
-					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(sc), 8, 8, tn_ptr[sprite_tn], PVR_FILTER_BILINEAR);
+					pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL4BPP | PVR_TXRFMT_4BPP_PAL(sc), 8, 8, tn_ptr[sprite_tn], PVR_FILTER_NONE);
 					pvr_poly_compile(&sprite_hdr[sp][next_index][(v*sh)+h], &cxt);
 					cxt.blend.src = PVR_BLEND_DESTCOLOR;
 					cxt.blend.dst = PVR_BLEND_ZERO;

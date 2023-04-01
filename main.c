@@ -107,7 +107,7 @@ void run_one_field(void)
 //			memset(tn_used,0,2048);
 //	}
 
-	//if (!field_skip) 
+	if (!field_skip) 
 	{
 		vdp_setup_pvr_planes();
 
