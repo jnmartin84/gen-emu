@@ -146,10 +146,10 @@ void do_frame()
 
 				vert.flags = PVR_CMD_VERTEX;
 				if(tpr == 0) {
-					vert.z = 2.0f + (0.01*si);
+					vert.z = 2.0f + (0.01*(sprites_size-si));
 				}
 				if(tpr == 1) {
-					vert.z = 4.0f + (0.01*si);
+					vert.z = 4.0f + (0.01*(sprites_size-si));
 				}
 
 				vert.x = (sx) + (h<<4);
