@@ -12,9 +12,8 @@
 
 #include "vdp.h"
 #include "input.h"
-uint64_t aligned_ram[8192];
-uint8_t *m68k_ram = (uint8_t *)aligned_ram;
-uint16_t *m68k_ram16 = (uint16_t *)aligned_ram;
+uint8_t  __attribute__ ((aligned(8))) m68k_ram[65536];
+uint16_t *m68k_ram16 = (uint16_t *)m68k_ram;
 uint8_t bank_sram = 0;
 
 void m68k_write_memory_32(uint32_t addr, uint32_t val);
