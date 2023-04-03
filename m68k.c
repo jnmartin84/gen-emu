@@ -106,25 +106,6 @@ static uint32_t m68k_read_unused_32(uint32_t addr) {
 }
 
 static uint32_t m68k_read_cart_32(uint32_t addr) {
-/*ret = cart.rom[addr]
-	if(!(addr & 0x3)) {
-		return *(uint32_t *)(addr);
-	}
-	else {
-		return (*(uint16_t *)(addr) << 16) | *(uint16_t *)(addr + 2);
-	}*/
-#define SWAP_WORDS(x) __asm__ volatile ("swap.w %0, %0" : "+r" (x))
-/*	if(!(addr & 0x3)) {
-		uint32_t val = *((uint32_t *)(cart.rom[addr]));
-		SWAP_WORDS(val);
-		uint16_t v1 = val >> 16;
-		uint32_t v2 = val & 0xffff;
-		SWAPBYTES16(v1);
-		SWAPBYTES16(v2);
-		return (v1 << 16) | v2;
-	}*/
-	
-	
 	uint32_t ret = (m68k_read_cart_16(addr) << 16);
 	ret |= m68k_read_cart_16(addr+2);
 	
@@ -268,7 +249,7 @@ static uint32_t m68k_read_cart_16(uint32_t addr) {
 		uint32_t ret;// = 0xffff;
 //	addr &= 0xffffff;
 
-#if 1
+#if 0
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -284,7 +265,7 @@ static uint32_t m68k_read_cart_16(uint32_t addr) {
 		} else {
 #endif
 			ret = ((uint16_t *)cart.rom)[addr >> 1];
-#if 1
+#if 0
 		}
 #endif
 		SWAPBYTES16(ret);
@@ -447,7 +428,7 @@ static uint32_t m68k_read_cart_8(uint32_t addr) {
 	uint32_t ret;// = 0xff;
 	//addr &= 0xffffff;
 
-#if 1
+#if 0
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -463,7 +444,7 @@ static uint32_t m68k_read_cart_8(uint32_t addr) {
 		} else {
 #endif
 			ret = cart.rom[addr];
-#if 1
+#if 0
 		}
 #endif	
 	return ret;
@@ -791,7 +772,7 @@ void m68k_write_memory_8(uint32_t addr, uint32_t val)
 
 //	if (debug)
 	//	printf("M68K  %06x <- %02x\n", addr, val);
-
+#if 0
 	if (addr < 0x400000) {
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
@@ -805,6 +786,7 @@ void m68k_write_memory_8(uint32_t addr, uint32_t val)
 			}
 		}
 	} else
+#endif
 	if (addr >= 0xe00000) {
 		m68k_ram[addr & 0xffff] = val;
 	} else
@@ -906,7 +888,7 @@ void m68k_write_memory_16(uint32_t addr, uint32_t val)
 
 //	if (debug)
 	//	printf("M68K  %06x <- %04x\n", addr, val);
-
+#if 0
 	if (addr < 0x400000) {
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
@@ -922,6 +904,7 @@ void m68k_write_memory_16(uint32_t addr, uint32_t val)
 			}
 		}
 	} else
+#endif		
 	if (addr >= 0xe00000) {
 		SWAPBYTES16(val);
 		m68k_ram16[(addr & 0xffff)/2] = val;

@@ -7,11 +7,11 @@
 #include "vdp.h"
 //#include "SN76489.h"
 
-KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS);// | INIT_OCRAM);
+KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS | INIT_OCRAM);
 #define FIELD_SKIP 2
 
 
-char *romname = "/cd/sonic2.bin";
+char *romname = "/cd/s1built.bin";
 
 char *scrcapname = "/pc/home/jkf/src/dc/gen-emu/screen.ppm";
 
@@ -36,8 +36,9 @@ extern struct plane_pvr_tile *planes_head;
 int main(int argc, char *argv[])
 {
 	int ch, fd;
+    dbgio_dev_select("fb");
+//    mmu_init();	
 
-//    dbgio_dev_select("fb");
 	gen_init();
 	
 	rom_load(romname);
@@ -94,13 +95,22 @@ extern int planes_size;
 void run_one_field(void)
 {
 	int line;
-	const uint32_t field_skip = (field_count % FIELD_SKIP);
+	const uint32_t field_skip = (field_count &1);//% FIELD_SKIP);
+
+	//	m68k_execute(488*262);
+
 
 	for(line = 0; line < 262 /*&& !quit*/; line++) {
 		vdp_interrupt(line);
 		m68k_execute(488);
 		//if (z80_enabled())
 		//	z80_execute(228);
+	if (!field_skip) 
+	{
+		if (line < 224 && !(line & 3)) {
+			vdp_render_plane(line);
+		}
+	}
 	}
 
 //	if(field_count % 5 == 0) {
@@ -109,9 +119,7 @@ void run_one_field(void)
 
 	if (!field_skip) 
 	{
-		vdp_setup_pvr_planes();
-
-		vdp_render_pvr_planes();
+//		vdp_render_pvr_planes();
 		vdp_render_pvr_sprites();
 
 		/* Submit whole screen to pvr. */
