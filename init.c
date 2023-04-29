@@ -10,8 +10,8 @@
 
 
 pvr_init_params_t pvr_params = {
-	{ PVR_BINSIZE_16, PVR_BINSIZE_0, PVR_BINSIZE_16,
-	  PVR_BINSIZE_0, PVR_BINSIZE_0 }, 512 * 1024
+	{ PVR_BINSIZE_0, PVR_BINSIZE_0, PVR_BINSIZE_0,
+	  PVR_BINSIZE_0, PVR_BINSIZE_16 }, 512 * 1024, 0, 0, 0
 };
 
 //extern SN76489 PSG; 
@@ -21,7 +21,6 @@ void gen_init(void)
 {
 	pvr_init(&pvr_params);
 //	pvr_mem_reset();
-	vid_border_color(0, 0, 255);
 //	pvr_set_bg_color(0, 0, 1.0f);
 
 	vdp_init();

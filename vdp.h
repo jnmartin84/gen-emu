@@ -5,7 +5,18 @@
 
 #include "gen-emu.h"
 
-struct __attribute__ ((packed, aligned(8))) vdp_s
+struct vdp_mem {
+	uint8_t  __attribute__ ((aligned(32))) regs[32];		/* Only first 24 used, rest are address padding. */
+	uint16_t  __attribute__ ((aligned(32))) vsram[64];		/* Only first 40 used. rest are address padding. */
+
+	uint16_t  __attribute__ ((aligned(32))) cram[64];
+	uint16_t  __attribute__ ((aligned(32))) dc_cram[64];	/* cram in dc format */
+
+	uint8_t  __attribute__ ((aligned(32))) vram[65536];
+
+};
+
+struct __attribute__ ((packed, aligned(4))) vdp_s
 {
 	uint32_t control;
 	uint32_t unused32_0;
@@ -32,14 +43,6 @@ struct __attribute__ ((packed, aligned(8))) vdp_s
 	uint8_t dis_cells;
 	uint8_t sat_dirty;
 	uint8_t unused8_0;
-
-	uint8_t vram[65536];
-	uint8_t regs[32];		/* Only first 24 used, rest are address padding. */
-
-	uint16_t vsram[64];		/* Only first 40 used. rest are address padding. */
-
-	uint16_t cram[64];
-	uint16_t dc_cram[64];	/* cram in dc format */
 };
 
 uint16_t vdp_control_read(void);
@@ -52,8 +55,7 @@ void vdp_init(void);
 void vdp_render_cram(void);
 void vdp_render_scanline(int);
 
-struct plane_pvr_tile {
-	pvr_poly_hdr_t *hdr;
+struct __attribute__ ((packed,aligned(4))) plane_pvr_tile {
 	int x;
 	int y;
 	int hf;
@@ -61,11 +63,10 @@ struct plane_pvr_tile {
 	int plane;
 	int priority;
 	int unused;
+	pvr_poly_hdr_t *hdr;
 };
 
-struct vdp_pvr_sprite {
-	// 0 - 64
-	pvr_poly_hdr_t *hdr[16];
+struct __attribute__ ((packed,aligned(4))) vdp_pvr_sprite {
 	// 64
 	int x;
 	// 68
@@ -83,6 +84,8 @@ struct vdp_pvr_sprite {
 	// 92 - 128
 	// 9 doesn't work but 17 does 
 		int unused[17];
+	// 0 - 64
+	pvr_poly_hdr_t *hdr[16];
 };
 
 #endif // __gen_vdp_h

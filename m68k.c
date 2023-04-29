@@ -12,7 +12,7 @@
 
 #include "vdp.h"
 #include "input.h"
-uint8_t  __attribute__ ((aligned(8))) m68k_ram[65536];
+uint8_t   __attribute__ ((aligned(32))) m68k_ram[65536];
 uint16_t *m68k_ram16 = (uint16_t *)m68k_ram;
 uint8_t bank_sram = 0;
 
@@ -106,34 +106,48 @@ static uint32_t m68k_read_unused_32(uint32_t addr) {
 }
 
 static uint32_t m68k_read_cart_32(uint32_t addr) {
-/*ret = cart.rom[addr]
-	if(!(addr & 0x3)) {
-		return *(uint32_t *)(addr);
+	uint32_t saddr = addr >> 1;
+	uint16_t ret1;
+	uint16_t ret2;
+	if(!(addr & 3)) {
+	uint32_t retrom = ((uint32_t *)cart.rom)[addr>>2];
+	ret1 = retrom & 0xffff;//((uint16_t *)&retrom);
+	ret2 = retrom >> 16;//((uint16_t *)&retrom + 2)//cart.rom)[saddr+1];
 	}
-	else {
-		return (*(uint16_t *)(addr) << 16) | *(uint16_t *)(addr + 2);
-	}*/
-#define SWAP_WORDS(x) __asm__ volatile ("swap.w %0, %0" : "+r" (x))
-/*	if(!(addr & 0x3)) {
-		uint32_t val = *((uint32_t *)(cart.rom[addr]));
-		SWAP_WORDS(val);
-		uint16_t v1 = val >> 16;
-		uint32_t v2 = val & 0xffff;
-		SWAPBYTES16(v1);
-		SWAPBYTES16(v2);
-		return (v1 << 16) | v2;
-	}*/
-	
-	
-	uint32_t ret = (m68k_read_cart_16(addr) << 16);
-	ret |= m68k_read_cart_16(addr+2);
+	else 
+	{
+	ret1 = ((uint16_t *)cart.rom)[saddr];
+	ret2 = ((uint16_t *)cart.rom)[saddr+1];
+	}
+	SWAPBYTES16(ret1);
+	SWAPBYTES16(ret2);
+		
+	uint32_t ret = (ret1 << 16) | ret2;
 	
 	return ret;
 }
 
 static uint32_t m68k_read_ram_32(uint32_t addr) {
-	uint32_t ret = (m68k_read_ram_16(addr) << 16);
+/*	uint32_t ret = m68k_read_ram_16(addr) << 16;
 	ret |= m68k_read_ram_16(addr+2);
+*/
+	uint32_t saddr = (addr&0xffff) >> 1;
+	uint16_t ret1;
+	uint16_t ret2;
+	if(!(addr & 3)) {
+	uint32_t retrom = ((uint32_t *)m68k_ram)[(addr&0xffff)>>2];
+	ret1 = retrom & 0xffff;
+	ret2 = retrom >> 16;
+	}
+	else 
+	{
+	ret1 =  m68k_ram16[saddr];
+	ret2 =  m68k_ram16[saddr+1];
+	}
+	SWAPBYTES16(ret1);
+	SWAPBYTES16(ret2);
+		
+	uint32_t ret = (ret1 << 16) | ret2;
 	
 	return ret;
 }
@@ -143,14 +157,14 @@ uint32_t m68k_read_memory_16(uint32_t addr) {
 }
 
 static uint32_t x16(uint32_t addr) {
-	uint32_t ret;// = 0xFFFF;
+	uint32_t ret = 0;// = 0xFFFF;
 
-	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
+/*	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
 		if (z80_running && z80_busreq) {
 			ret = z80_read_mem(addr & 0x7fff);
 			ret |= ret << 8;
 		}
-	} else
+	} else*/
 	if ((addr >= 0xa10000) && (addr <= 0xa1001f)) {
 		/* Controller I/O addresses. */
 		switch(addr & 0x1f) {
@@ -226,8 +240,9 @@ static uint32_t x16(uint32_t addr) {
 		ret = z80_running << 8;
 		break;
 	default:
-		printf("Unhandled memory read from %06x\n", addr);
+		//printf("Unhandled memory read from %06x\n", addr);
 		quit = 1;
+		break;
 	}
 
 	return ret;
@@ -235,7 +250,7 @@ static uint32_t x16(uint32_t addr) {
 
 static uint32_t m68k_read_vdp_16(uint32_t addr) {
 
-	uint32_t ret;// = 0xFFFF;
+	uint32_t ret = 0;// = 0xFFFF;
 
  // vdp  & psg
 			//	if ((addr & 0xe700e0) == 0xc00000) {
@@ -265,10 +280,10 @@ static uint32_t m68k_read_unused_16(uint32_t addr) {
 }
 
 static uint32_t m68k_read_cart_16(uint32_t addr) {
-		uint32_t ret;// = 0xffff;
+		uint32_t ret = 0;// = 0xffff;
 //	addr &= 0xffffff;
 
-#if 1
+#if 0
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -284,7 +299,7 @@ static uint32_t m68k_read_cart_16(uint32_t addr) {
 		} else {
 #endif
 			ret = ((uint16_t *)cart.rom)[addr >> 1];
-#if 1
+#if 0
 		}
 #endif
 		SWAPBYTES16(ret);
@@ -303,12 +318,12 @@ uint32_t m68k_read_memory_8(uint32_t addr) {
 
 static uint32_t x8(uint32_t addr) {
 
-	uint32_t ret;// = 0xFF;
-
+	uint32_t ret = 0;// = 0xFF;
+/*
 	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
 		if (z80_running && z80_busreq)
 			ret = z80_read_mem(addr & 0x7fff);
-	} else
+	} else*/
 	if ((addr >= 0xa10000) && (addr <= 0xa1001f)) {
 		/* Controller I/O addresses. */
 		switch(addr & 0x1f) {
@@ -394,8 +409,9 @@ static uint32_t x8(uint32_t addr) {
 		ret = z80_running;
 		break;
 	default:
-		printf("Unhandled memory read from %06x\n", addr);
+		//printf("Unhandled memory read from %06x\n", addr);
 		quit = 1;
+		break;
 	}
 
 	return ret;
@@ -403,7 +419,7 @@ static uint32_t x8(uint32_t addr) {
 
 static uint32_t m68k_read_vdp_8(uint32_t addr) {
 
-	uint32_t ret;// = 0xFF;
+	uint32_t ret = 0;// = 0xFF;
 	if ((addr & 0xe700e0) == 0xc00000) {
 			switch(addr & 0x1f) {
 			case 0x00:
@@ -440,14 +456,14 @@ static uint32_t m68k_read_vdp_8(uint32_t addr) {
 }
 
 static uint32_t m68k_read_unused_8(uint32_t addr) {
-	return 0xFF;
+	return 0;//0xFF;
 }
 
 static uint32_t m68k_read_cart_8(uint32_t addr) {
-	uint32_t ret;// = 0xff;
+	uint32_t ret = 0;// = 0xff;
 	//addr &= 0xffffff;
 
-#if 1
+#if 0
 		if ((cart.sram_len > 0) &&
 			((addr >= cart.sram_start) &&
 			 (addr <= cart.sram_end))) {
@@ -463,7 +479,7 @@ static uint32_t m68k_read_cart_8(uint32_t addr) {
 		} else {
 #endif
 			ret = cart.rom[addr];
-#if 1
+#if 0
 		}
 #endif	
 	return ret;
@@ -538,10 +554,10 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 			}
 		}
 	} else
-	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
+/*	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
 		if (z80_running && z80_busreq)
 			ret = z80_read_mem(addr & 0x7fff);
-	} else
+	} else*/
 	if ((addr >= 0xa10000) && (addr <= 0xa1001f)) {
 		/* Controller I/O addresses. */
 		switch(addr & 0x1f) {
@@ -627,9 +643,9 @@ uint32_t m68k_read_memory_8(uint32_t addr)
 		ret = z80_running;
 		break;
 	default:
-		while(1) {printf("Unhandled 8-bit memory read from %06x\n", addr);
-		}
+		//while(1) {printf("Unhandled 8-bit memory read from %06x\n", addr);}
 		quit = 1;
+		break;
 	}
 
 //	if (debug)
@@ -771,9 +787,9 @@ uint32_t m68k_read_memory_16(uint32_t addr)
 		ret = z80_running << 8;
 		break;
 	default:
-		while(1) {		printf("Unhandled 16-bit memory read from %06x\n", addr);
-}
+//		while(1) {		printf("Unhandled 16-bit memory read from %06x\n", addr);}
 		quit = 1;
+		break;
 	}
 
 //	if (debug)
@@ -833,10 +849,10 @@ void m68k_write_memory_8(uint32_t addr, uint32_t val)
 			}
 		}
 	} else
-	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
+/*	if ((addr >= 0xa00000) && (addr <= 0xa0ffff)) {
 		if (z80_running && z80_busreq)
 			z80_write_mem(addr & 0x7fff, val & 0xff);
-	} else
+	} else*/
 	if ((addr >= 0xa10000) && (addr <= 0xa1001f)) {
 		/* Controller I/O addresses. */
 		switch(addr & 0x1f) {
@@ -894,8 +910,9 @@ void m68k_write_memory_8(uint32_t addr, uint32_t val)
 			cart.banks[(addr & 0xe) >> 1] = (uint32_t)(cart.rom + (val << 19));
 		break;
 	default:
-		while(1) {printf("Unhandled 8-bit memory write to %06x, value %02x\n", addr, val);}
+//		while(1) {printf("Unhandled 8-bit memory write to %06x, value %02x\n", addr, val);}
 		quit = 1;
+		break;
 	}
 }
 
@@ -978,8 +995,9 @@ void m68k_write_memory_16(uint32_t addr, uint32_t val)
 			cart.banks[(addr & 0xe) >> 1] = (uint32_t)(cart.rom + ((val & 0xff) << 19));
 		break;
 	default:
-		while(1) {printf("Unhandled 16-bit memory write to %06x, value %04x\n", addr, val);}
+//		while(1) {printf("Unhandled 16-bit memory write to %06x, value %04x\n", addr, val);}
 		quit = 1;
+		break;
 	}
 }
 

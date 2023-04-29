@@ -31,6 +31,9 @@ uint8_t ctlr_data_reg_read(int port)
 
 	if (caddr[port] != NULL) {
 		cont_state_t *cont = maple_dev_status(caddr[port]);
+		if(cont->ltrig) {
+				gen_reset();
+		}
 
 		ret |= outputs[port];
 		if (outputs[port] & 0x40) {

@@ -11,7 +11,7 @@ KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS);// | INIT_OCRAM);
 #define FIELD_SKIP 2
 
 
-char *romname = "/cd/sonic2.bin";
+char *romname = "/cd/vector2.bin";
 
 char *scrcapname = "/pc/home/jkf/src/dc/gen-emu/screen.ppm";
 
@@ -32,6 +32,7 @@ uint64_t start_time;
 uint64_t end_time;
 uint64_t total_cycles;
 extern struct plane_pvr_tile *planes_head;
+extern uint8_t __attribute__ ((aligned(32))) tn_mod[2048];
 
 int main(int argc, char *argv[])
 {
@@ -43,6 +44,7 @@ int main(int argc, char *argv[])
 	rom_load(romname);
 
 	gen_reset();
+//memset(tn_mod,1,2048);
 
 	start_time = rtc_unix_secs();
 	do {
@@ -89,12 +91,12 @@ paused:
 }
 
 char str[256];
-extern uint8_t tn_used[4096];
+//extern uint8_t tn_used[4096];
 extern int planes_size;
 void run_one_field(void)
 {
+	const uint32_t field_skip = (field_count & 7);//% FIELD_SKIP);
 	int line;
-	const uint32_t field_skip = (field_count % FIELD_SKIP);
 
 	for(line = 0; line < 262 /*&& !quit*/; line++) {
 		vdp_interrupt(line);
@@ -103,29 +105,28 @@ void run_one_field(void)
 		//	z80_execute(228);
 	}
 
-//	if(field_count % 5 == 0) {
-//			memset(tn_used,0,2048);
-//	}
-
-	if (!field_skip) 
+//	if (field_skip) 
 	{
-		vdp_setup_pvr_planes();
+		vdp_setup();
+		pvr_wait_ready();
+		pvr_scene_begin(); 
+		pvr_list_begin(PVR_LIST_PT_POLY);
 
 		vdp_render_pvr_planes();
 		vdp_render_pvr_sprites();
 
-		/* Submit whole screen to pvr. */
-		do_frame();
+		pvr_list_finish();
+		pvr_scene_finish();
 	}
 
 	/* Send sound to ASIC, call once per frame */
 	//Sync76489(&PSG,SN76489_FLUSH);
-
+#if 1
 	/* input processing */
 	field_count++;
 	end_time = rtc_unix_secs();
 
-#if 1
+
 	total_cycles = (127856 * field_count/**FIELD_SKIP*/) ;
 	double emulated_MHz = (total_cycles / 1048576.0) / (end_time - start_time);
 	sprintf(str, "emulated mhz: %f", emulated_MHz);

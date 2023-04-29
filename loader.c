@@ -20,6 +20,8 @@ cart_t cart;
 #define USE_SONIC2_H 1
 
 #if USE_SONIC2_H
+//#include "tforce4.h"
+//#include "vector2.h"
 #include "sonic2.h"
 #endif
 
